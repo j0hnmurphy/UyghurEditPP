@@ -1,10 +1,12 @@
 ﻿/*
  * Shows message boxes centered on the window they belong to.
  *
- * MessageBox.Show places the box where Windows decides (usually the middle of the
- * screen), even when an owner window is given. A thread-local CBT hook catches the
- * moment the message box is activated, moves it to the center of the owner window
- * (kept inside the working area of the owner's monitor), and removes itself.
+ * Show uses the program's own ThemedMessageBox (light/dark theme). When that cannot be
+ * shown, the system MessageBox is used: MessageBox.Show places the box where Windows
+ * decides (usually the middle of the screen), even when an owner window is given, so a
+ * thread-local CBT hook catches the moment the message box is activated, moves it to the
+ * center of the owner window (kept inside the working area of the owner's monitor), and
+ * removes itself.
  */
 using System;
 using System.Drawing;
@@ -18,11 +20,65 @@ namespace UyghurEditPP
 	{
 		public static DialogResult Show(IWin32Window owner, string text, string caption = "", MessageBoxButtons buttons = MessageBoxButtons.OK, MessageBoxIcon icon = MessageBoxIcon.None)
 		{
+			// The captions are Latin ("UyghurEdit++ v0.83.0"): keep "++" at the end when read right to left.
+			return ShowHere(owner, text, LeftToRight(caption), buttons, icon);
+		}
+
+		/// <summary>Show with the caption as given (Show marks a Latin caption for right-to-left text).</summary>
+		internal static DialogResult ShowHere(IWin32Window owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
+		{
+			// A window may only be used on its own thread: from another thread (an error in a
+			// background task) the box is shown on the main window's thread.
+			Control control = owner as Control;
+			if(control == null){
+				control = UiThreadWindow();
+				if(control != null && !control.InvokeRequired){
+					control = null;   // already on the UI thread, and no owner was given
+				}
+			}
+			if(control != null && control.InvokeRequired){
+				try{
+					Control target = control;
+					return (DialogResult)target.Invoke(new Func<DialogResult>(() => ShowHere(target, text, caption, buttons, icon)));
+				}
+				catch(Exception ee){
+					System.Diagnostics.Debug.WriteLine(ee);
+					owner = null;   // the window is gone: show the system box without an owner
+				}
+			}
+			else if(owner != null || System.Threading.Thread.CurrentThread.GetApartmentState() == System.Threading.ApartmentState.STA){
+				try{
+					return ThemedMessageBox.ShowBox(owner, text, caption, buttons, icon, RightToLeftUi, UiTheme.Current);
+				}
+				catch(Exception ee){
+					System.Diagnostics.Debug.WriteLine(ee);
+				}
+			}
+			return SystemBox(owner, text, caption, buttons, icon);
+		}
+
+		// The main window from any thread (MainWindow only gives it on its own thread).
+		static Control UiThreadWindow()
+		{
+			try{
+				foreach(Form form in Application.OpenForms){
+					if(form is MainForm && !form.IsDisposed && form.IsHandleCreated){
+						return form;
+					}
+				}
+			}
+			catch(InvalidOperationException){
+				// the list changed while it was read on another thread
+			}
+			return null;
+		}
+
+		// The system MessageBox, when the program's own box cannot be shown.
+		static DialogResult SystemBox(IWin32Window owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
+		{
 			IntPtr ownerHandle = owner != null ? owner.Handle : IntPtr.Zero;
 			// In the Arabic-script UI the box reads from right to left.
 			MessageBoxOptions options = RightToLeftUi ? MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign : 0;
-			// The captions are Latin ("UyghurEdit++ v0.83.0"): keep "++" at the end when read right to left.
-			caption = LeftToRight(caption);
 			return Run(ownerHandle, () => owner != null
 				? MessageBox.Show(owner, text, caption, buttons, icon, MessageBoxDefaultButton.Button1, options)
 				: MessageBox.Show(text, caption, buttons, icon, MessageBoxDefaultButton.Button1, options));
