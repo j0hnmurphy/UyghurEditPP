@@ -115,9 +115,6 @@
     <Reference Include="System.Xml.Linq">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
     </Reference>
-    <Reference Include="Tesseract, Version=5.2.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>packages\Tesseract.5.2.0\lib\net48\Tesseract.dll</HintPath>
-    </Reference>
     <Reference Include="UIAutomationProvider">
       <RequiredTargetFramework>3.0</RequiredTargetFramework>
     </Reference>
@@ -313,18 +310,6 @@
     </Compile>
     <Compile Include="Ngram\TstTree.cs" />
     <Compile Include="Ngram\UNode.cs" />
-    <Compile Include="ocr\OCRForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="ocr\OCRForm.Designer.cs">
-      <DependentUpon>OCRForm.cs</DependentUpon>
-    </Compile>
-    <Compile Include="ocr\ResimRamka.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Include="ocr\ResimRamka.Designer.cs">
-      <DependentUpon>ResimRamka.cs</DependentUpon>
-    </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="SafeFile.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -485,36 +470,12 @@
     <EmbeddedResource Include="MainForm.resx">
       <DependentUpon>MainForm.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="ocr\OCRForm.resx">
-      <DependentUpon>OCRForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="ocr\ResimRamka.resx">
-      <DependentUpon>ResimRamka.cs</DependentUpon>
-    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
     <None Include="app.manifest" />
     <EmbeddedResource Include="langdata.json" />
     <None Include="packages.config" />
-    <None Include="tessdata\chi_sim.traineddata">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="tessdata\eng.traineddata">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="tessdata\rus.traineddata">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="tessdata\tur.traineddata">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="tessdata\uig.traineddata">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="tessdata\ukij.traineddata">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <EmbeddedResource Include="uyghur_imla.txt">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </EmbeddedResource>
@@ -529,18 +490,4 @@
     </None>
   </ItemGroup>
   <ItemGroup />
-  <Import Project="packages\Tesseract.5.2.0\build\Tesseract.targets" Condition="Exists('packages\Tesseract.5.2.0\build\Tesseract.targets')" />
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
-    </PropertyGroup>
-    <Error Condition="!Exists('packages\Tesseract.5.2.0\build\Tesseract.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Tesseract.5.2.0\build\Tesseract.targets'))" />
-  </Target>
-  <!-- The program is x64 only (PlatformTarget), so do not copy the x86 native DLLs that Tesseract.targets adds. -->
-  <Target Name="SkipX86TesseractNatives" BeforeTargets="AssignTargetPaths">
-    <ItemGroup>
-      <_X86TesseractNative Include="@(None)" Condition="$([System.String]::Copy('%(None.Link)').StartsWith('x86\'))" />
-      <None Remove="@(_X86TesseractNative)" />
-    </ItemGroup>
-  </Target>
 </Project>

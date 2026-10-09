@@ -21,36 +21,36 @@ namespace UyghurEditPP.Tests
 			Assert.AreEqual(key, lang.GetText(key));
 		}
 
-		const string Key4 = "OCR could not start because a Visual C++ runtime library is missing. Please install the Microsoft Visual C++ Redistributable (x64):";
-		const string Key5 = "OCR could not start. Please check that this folder contains the language data (.traineddata) files:";
-
 		// Latin product names and file types stay in Latin letters in UEY and USY.
 		[TestMethod]
 		public void LatinParts_StayLatinInEveryScript()
 		{
-			Language lang = new Language();
 			const string LRI = "\u200E", PDI = "\u200E"; // a LEFT-TO-RIGHT MARK at both ends
+			string uly = "{Microsoft Word} ambiri kem bolghachqa ({.docx}). {Windows} ni ornitip béqing:";
+
+			Assert.AreEqual("Microsoft Word ambiri kem bolghachqa (.docx). Windows ni ornitip béqing:", Language.Yeziqla(uly, "uly"));
+			Assert.AreEqual(
+				LRI + "Microsoft Word" + PDI + Uyghur.ULY2UEY(" ambiri kem bolghachqa (") + LRI + ".docx" + PDI + Uyghur.ULY2UEY("). ")
+				+ LRI + "Windows" + PDI + Uyghur.ULY2UEY(" ni ornitip béqing:"),
+				Language.Yeziqla(uly, "uey"));
+			Assert.AreEqual(
+				"Microsoft Word" + Uyghur.ULY2USY(" ambiri kem bolghachqa (") + ".docx" + Uyghur.ULY2USY("). ")
+				+ "Windows" + Uyghur.ULY2USY(" ni ornitip béqing:"),
+				Language.Yeziqla(uly, "usy"));
+		}
+
+		[TestMethod]
+		public void FollowWindows_KeepsWindowsInLatin()
+		{
+			Language lang = new Language();
+			string key = "Follow Windows";
 
 			lang.LanguaID = "uly";
-			Assert.AreEqual("Visual C++ ambiri kem bolghachqa OCR qozghalmidi. Microsoft Visual C++ Redistributable (x64) ni ornitip béqing:", lang.GetText(Key4));
-			Assert.AreEqual("OCR qozghalmidi. Töwendiki qisquchta til sanliq melumat (.traineddata) höjjetliri barmu, tekshürüp béqing:", lang.GetText(Key5));
-
+			Assert.AreEqual("Windows bilen birdek", lang.GetText(key));
 			lang.LanguaID = "uey";
-			Assert.AreEqual(
-				LRI + "Visual C++" + PDI + Uyghur.ULY2UEY(" ambiri kem bolghachqa ") + LRI + "OCR" + PDI + Uyghur.ULY2UEY(" qozghalmidi. ")
-				+ LRI + "Microsoft Visual C++ Redistributable (x64)" + PDI + Uyghur.ULY2UEY(" ni ornitip béqing:"),
-				lang.GetText(Key4));
-			Assert.AreEqual(
-				LRI + "OCR" + PDI + Uyghur.ULY2UEY(" qozghalmidi. Töwendiki qisquchta til sanliq melumat (") + LRI + ".traineddata" + PDI + Uyghur.ULY2UEY(") höjjetliri barmu, tekshürüp béqing:"),
-				lang.GetText(Key5));
-
+			StringAssert.StartsWith(lang.GetText(key), "\u200EWindows\u200E");
 			lang.LanguaID = "usy";
-			Assert.AreEqual(
-				"Visual C++" + Uyghur.ULY2USY(" ambiri kem bolghachqa ") + "OCR" + Uyghur.ULY2USY(" qozghalmidi. ")
-				+ "Microsoft Visual C++ Redistributable (x64)" + Uyghur.ULY2USY(" ni ornitip béqing:"),
-				lang.GetText(Key4));
-			StringAssert.StartsWith(lang.GetText(Key5), "OCR");
-			StringAssert.Contains(lang.GetText(Key5), "(.traineddata)");
+			StringAssert.StartsWith(lang.GetText(key), "Windows");
 		}
 
 		// Texts without {...} are converted exactly as before.
@@ -72,30 +72,16 @@ namespace UyghurEditPP.Tests
 			string old = MainForm.gLang.LanguaID;
 			try{
 				MainForm.gLang.LanguaID = "uey";
-				Assert.AreEqual("\u200EE:\\a\\tessdata\u200E\r\n\r\n\u200EFailed.\u200E", CenteredMessageBox.LeftToRight("E:\\a\\tessdata\r\n\r\nFailed."));
+				Assert.AreEqual("\u200EE:\\a\\b\u200E\r\n\r\n\u200EFailed.\u200E", CenteredMessageBox.LeftToRight("E:\\a\\b\r\n\r\nFailed."));
 				Assert.IsTrue(CenteredMessageBox.RightToLeftUi);
 
 				MainForm.gLang.LanguaID = "uly";
-				Assert.AreEqual("E:\\a\\tessdata", CenteredMessageBox.LeftToRight("E:\\a\\tessdata"));
+				Assert.AreEqual("E:\\a\\b", CenteredMessageBox.LeftToRight("E:\\a\\b"));
 				Assert.IsFalse(CenteredMessageBox.RightToLeftUi);
 			}
 			finally{
 				MainForm.gLang.LanguaID = old;
 			}
-		}
-
-		[TestMethod]
-		public void OcrTitle_KeepsOcrInLatin()
-		{
-			Language lang = new Language();
-			string key = "Uyghurche OCR(Resimdiki Yéziqni Tonush) Programmisi";
-
-			lang.LanguaID = "uly";
-			Assert.AreEqual(key, lang.GetText(key));
-			lang.LanguaID = "eng";
-			StringAssert.Contains(lang.GetText(key), "OCR");
-			lang.LanguaID = "uey";
-			StringAssert.Contains(lang.GetText(key), "\u200EOCR\u200E");
 		}
 
 		[TestMethod]

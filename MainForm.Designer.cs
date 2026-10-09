@@ -112,7 +112,6 @@ namespace UyghurEditPP
 		private System.Windows.Forms.ToolStripSeparator toolStripSeparator12;
 		private System.Windows.Forms.ToolStripMenuItem menuTekrar;
 		private System.Windows.Forms.ToolStripSeparator toolStripSeparator15;
-		private System.Windows.Forms.ToolStripMenuItem menuOCR;
 		private System.Windows.Forms.ToolStripStatusLabel stBarEncode;
 		private System.Windows.Forms.ToolStripMenuItem menuFont;
 		private System.Windows.Forms.ToolStripSeparator toolStripSeparator18;
@@ -121,7 +120,6 @@ namespace UyghurEditPP
 		private System.Windows.Forms.ToolStripSeparator toolStripSeparator19;
 		private System.Windows.Forms.ToolStripSeparator toolStripSeparator20;
 		private System.Windows.Forms.ToolStripMenuItem menuImlaAmbar;
-		private System.Windows.Forms.ToolStripSeparator toolStripSeparator21;
 		private System.Windows.Forms.ToolStripMenuItem menuMakeHTML;
 		
 		
@@ -227,8 +225,6 @@ namespace UyghurEditPP
             this.menuTiz = new System.Windows.Forms.ToolStripMenuItem();
             this.menuTekrar = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator15 = new System.Windows.Forms.ToolStripSeparator();
-            this.menuOCR = new System.Windows.Forms.ToolStripMenuItem();
-            this.toolStripSeparator21 = new System.Windows.Forms.ToolStripSeparator();
             this.menuMakeHTML = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator22 = new System.Windows.Forms.ToolStripSeparator();
             this.menuSaveToDOCX = new System.Windows.Forms.ToolStripMenuItem();
@@ -1056,8 +1052,6 @@ namespace UyghurEditPP
             this.menuTiz,
             this.menuTekrar,
             this.toolStripSeparator15,
-            this.menuOCR,
-            this.toolStripSeparator21,
             this.menuMakeHTML,
             this.toolStripSeparator22,
             this.menuSaveToDOCX,
@@ -1088,20 +1082,6 @@ namespace UyghurEditPP
             // 
             this.toolStripSeparator15.Name = "toolStripSeparator15";
             this.toolStripSeparator15.Size = new System.Drawing.Size(207, 6);
-            // 
-            // menuOCR
-            // 
-            this.menuOCR.Name = "menuOCR";
-            this.menuOCR.Size = new System.Drawing.Size(210, 22);
-            this.menuOCR.Text = "OCR";
-            this.menuOCR.ToolTipText = "Resimni yeziqqa aylanduridu";
-            this.menuOCR.Click += new System.EventHandler(this.MenuOCRClick);
-            this.menuOCR.MouseEnter += new System.EventHandler(this.MenuMouseEntered);
-            // 
-            // toolStripSeparator21
-            // 
-            this.toolStripSeparator21.Name = "toolStripSeparator21";
-            this.toolStripSeparator21.Size = new System.Drawing.Size(207, 6);
             // 
             // menuMakeHTML
             // 

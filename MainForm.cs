@@ -76,8 +76,6 @@ namespace UyghurEditPP
 		
 		FindReplaceDialog gFindReplace = null;
 		
-		OCRForm gOCR = null;
-		
 		// Spelling dictionaries, loaded in the background once per script.
 		ImlaAmbarliri gImlaAmbarliri = new ImlaAmbarliri(
 			() => System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("UyghurEditPP.uyghur_imla.txt"),
@@ -798,7 +796,8 @@ namespace UyghurEditPP
 			if(gConfig.ContainsKey("IZLAR")){
 				string[] tmpiz= (string[])gConfig["IZLAR"];
 				foreach(string iz in tmpiz){
-					if(File.Exists(iz)){
+					// Images opened in the removed text recognition window are dropped.
+					if(File.Exists(iz) && !IsImageFile(iz)){
 						gIzlar.Add(iz);
 					}
 					else if(gIzOffset.ContainsKey(iz)){
@@ -963,9 +962,6 @@ namespace UyghurEditPP
 			}
 			UpdateMessage();
 			gFindReplace.UpdateMessages();
-			if(gOCR!=null && !gOCR.IsDisposed){
-				gOCR.UpdateMessages();
-			}
 		}
 
 
@@ -1066,8 +1062,6 @@ namespace UyghurEditPP
 
 			menuYeziqAuto.Text = gLang.GetText("Közitidighan Yéziqni Aptomatik Tallisun");
 			menuYeziqAuto.ToolTipText = gLang.GetText("Höjjet közniki almashqanda shu köznektiki yéziqqa mas kélidighan Imla Tekshürgüchni aktiplaydu");
-
-			menuOCR.ToolTipText = gLang.GetText("Resimni yéziqqa aylanduridu");
 
 
 			this.toolULY2UEY.ToolTipText = gLang.GetText("Hazirqi höjjet yaki Tallan’ghan rayondiki Latinchini Uyghurchigha aylanduridu");
@@ -1173,10 +1167,6 @@ namespace UyghurEditPP
 			mainTab.Invalidate();
 			UiThemer.Apply(gContextMenu, theme);
 			UiThemer.Apply(gFindReplace, theme);
-			if(gOCR != null && !gOCR.IsDisposed){
-				UiThemer.Apply(gOCR, theme);
-				gOCR.Invalidate(true);
-			}
 			UiTheme.SetTitleBar(Handle, theme.IsDark);
 			Invalidate(true);
 		}
@@ -1206,8 +1196,7 @@ namespace UyghurEditPP
 		{
 			OpenFileDialog opnFileDlg = new OpenFileDialog();
 			string filter= "Text files|*.txt;*.uut|";
-			filter += "Image files|" + gImgexts;
-			filter += "|All files|*.*";
+			filter += "All files|*.*";
 			opnFileDlg.Filter = filter;
 			opnFileDlg.Multiselect = false;
 			if(opnFileDlg.ShowDialog(this)== DialogResult.OK)
@@ -1222,16 +1211,19 @@ namespace UyghurEditPP
 			if(File.Exists(filename)){
 				filename = Path.GetFullPath(filename);
 			}
-			String  extName = Path.GetExtension(filename);
-			if(extName.Length>0 && gImgexts.IndexOf(extName,StringComparison.OrdinalIgnoreCase)!=-1)
-			{
-				UpdateIzlar(filename);
-				MenuOCRClick(null,null);
-				gOCR.ImageFile = filename;
+			// Images used to open in the text recognition window, which is now a separate
+			// program; an image is not opened as text, and the user is pointed to that program.
+			if(IsImageFile(filename)){
+				CenteredMessageBox.Show(this, gLang.GetText("Resimdiki tékistlerni tonush (OCR) üchün UyghurOCR ni ishliting."), "UyghurEdit++ v"+ GetVersion(), MessageBoxButtons.OK, MessageBoxIcon.Information);
+				return;
 			}
-			else{
-				AddNew(filename);
-			}
+			AddNew(filename);
+		}
+
+		static bool IsImageFile(string filename)
+		{
+			string extName = Path.GetExtension(filename);
+			return extName.Length>0 && gImgexts.IndexOf("*" + extName + ";",StringComparison.OrdinalIgnoreCase)!=-1;
 		}
 		
 		void MenuYengiClick(object sender, EventArgs e)
@@ -1478,12 +1470,6 @@ namespace UyghurEditPP
                     gEditor.BringCaretToView();
                 }
             }
-            else if (dataObject.GetDataPresent(DataFormats.Bitmap)){
-				Image img = (Image)dataObject.GetData(DataFormats.Bitmap);
-				MenuOCRClick(null,null);
-				gOCR.Resim = img;
-				img.Dispose();
-			}
 		}
 		
 		void ToolOchurClick(object sender, EventArgs e)
@@ -2343,18 +2329,6 @@ namespace UyghurEditPP
 			MenuYengiClick(null,null);
 			gEditor.WordWrap = false;
 			gEditor.Text = sortedabzaslar;
-		}
-		
-		void MenuOCRClick(object sender, EventArgs e)
-		{
-			if (gOCR==null || gOCR.IsDisposed){
-				gOCR = new OCRForm(gEditor);
-				AppFonts.Fix(gOCR);
-				UiThemer.Apply(gOCR, UiTheme.Current);
-				gOCR.Owner = this;
-				gOCR.ShowInTaskbar = false;
-				gOCR.Show(this);
-			}
 		}
 		
 		void MenuFontClick(object sender, EventArgs e)
