@@ -29,7 +29,7 @@ namespace UyghurEditPP
 		public Color TabBorder;
 		public Color Accent;         // the line on top of the active tab
 		public bool IsDark;
-		// Windows of their own (OCR, About ...): the form, its buttons and text boxes.
+		// Windows of their own (About, keyboard ...): the form, its buttons and text boxes.
 		public Color FormBack;
 		public Color FormText;
 		public Color ButtonBack;

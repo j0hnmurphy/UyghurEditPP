@@ -6,14 +6,13 @@ Text Editor with Spell Check Ability for Uyghur
 </p>
 
 # UyghurEdit++
-Mexsus Uyghurche tehrirlesh üchün tüzülgen, Imla tekshürüsh(Imlasi xata sözlerning astigha qizil siziq bilen dawamliq körsitip bérish), Yéziqlarni almashturush, OCR(Resimdiki tékistlerni tonush) iqtidari bolghan, heqsiz tehrirligüch.
+Mexsus Uyghurche tehrirlesh üchün tüzülgen, Imla tekshürüsh(Imlasi xata sözlerning astigha qizil siziq bilen dawamliq körsitip bérish), Yéziqlarni almashturush iqtidari bolghan, heqsiz tehrirligüch.
+
+Resimdiki tékistlerni tonush (OCR) üchün [UyghurOCR](https://github.com/gheyret/UyghurOCR) ni ishliting.
 
 
 Esli kodini chüshürüp özingiz yughurup(compile) qilip ishletsingiz bolidu. Eger teyyarsini ishletmekchi bolsingiz pestiki ulanmidin eng yéngisini chüshürüp ishliting.
 Zip ni yéyipla ichidiki UyghurEditPP.exe ni ijra qilsingiz bolidu.
-
-# Diqqet
-Eger OCR da xataliq körülse, [Microsoft Visual C++ Redistributable packages](https://aka.ms/vs/17/release/vc_redist.x64.exe) ni ornitip sinap béqing. chünki Tesseract OCR bu ambargha béqinidiken.
 
 <hr></hr>
 
@@ -120,11 +119,7 @@ sözlerde xataliqlarni bayqisanglar, melum qilsanglar xush bolimen.
 
 ![](screenshot/usy.png)
 
-![](screenshot/ocrnew.png)
-
 # Ishlitilgen ochuq kodlar
 Avalonedit: https://github.com/icsharpcode/AvalonEdit
 
 DynaJson: https://github.com/fujieda/DynaJson
-
-Tesseract .Net: https://github.com/charlesw/tesseract

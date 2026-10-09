@@ -19,7 +19,6 @@ namespace UyghurEditPP
 		private System.Windows.Forms.GroupBox groupBox1;
 		private System.Windows.Forms.LinkLabel linkLabel1;
 		private System.Windows.Forms.LinkLabel linkLabel3;
-		private System.Windows.Forms.LinkLabel linkLabel4;
 		private System.Windows.Forms.LinkLabel linkLabel2;
 		private System.Windows.Forms.Label label5;
 
@@ -62,7 +61,6 @@ namespace UyghurEditPP
 			this.groupBox1 = new System.Windows.Forms.GroupBox();
 			this.linkLabel1 = new System.Windows.Forms.LinkLabel();
 			this.linkLabel3 = new System.Windows.Forms.LinkLabel();
-			this.linkLabel4 = new System.Windows.Forms.LinkLabel();
 			this.linkLabel2 = new System.Windows.Forms.LinkLabel();
 			this.label5 = new System.Windows.Forms.Label();
 			((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
@@ -158,18 +156,6 @@ namespace UyghurEditPP
 			this.linkLabel3.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
 			this.linkLabel3.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.LinkLabel1LinkClicked);
 			// 
-			// linkLabel4
-			// 
-			this.linkLabel4.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
-			| System.Windows.Forms.AnchorStyles.Right)));
-			this.linkLabel4.Location = new System.Drawing.Point(38, 245);
-			this.linkLabel4.Name = "linkLabel4";
-			this.linkLabel4.Size = new System.Drawing.Size(399, 23);
-			this.linkLabel4.TabIndex = 13;
-			this.linkLabel4.TabStop = true;
-			this.linkLabel4.Text = "https://github.com/charlesw/tesseract";
-			this.linkLabel4.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
-			// 
 			// linkLabel2
 			// 
 			this.linkLabel2.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
@@ -196,10 +182,9 @@ namespace UyghurEditPP
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(96F, 96F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Dpi;
-			this.ClientSize = new System.Drawing.Size(442, 279);
+			this.ClientSize = new System.Drawing.Size(442, 255);
 			this.Controls.Add(this.label5);
 			this.Controls.Add(this.linkLabel2);
-			this.Controls.Add(this.linkLabel4);
 			this.Controls.Add(this.linkLabel3);
 			this.Controls.Add(this.linkLabel1);
 			this.Controls.Add(this.groupBox1);

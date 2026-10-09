@@ -182,16 +182,6 @@
     "jpn": "ユーザー辞書に単語を保存できませんでした:",
     "eng": "Could not save the word to the user dictionary:"
   },
-  "OCR could not start because a Visual C++ runtime library is missing. Please install the Microsoft Visual C++ Redistributable (x64):": {
-    "uly": "{Visual C++} ambiri kem bolghachqa {OCR} qozghalmidi. {Microsoft Visual C++ Redistributable (x64)} ni ornitip béqing:",
-    "jpn": "Visual C++ ランタイムのライブラリが無いため OCR を開始できませんでした。Microsoft Visual C++ 再頒布可能パッケージ (x64) をインストールしてください:",
-    "eng": "OCR could not start because a Visual C++ runtime library is missing. Please install the Microsoft Visual C++ Redistributable (x64):"
-  },
-  "OCR could not start. Please check that this folder contains the language data (.traineddata) files:": {
-    "uly": "{OCR} qozghalmidi. Töwendiki qisquchta til sanliq melumat ({.traineddata}) höjjetliri barmu, tekshürüp béqing:",
-    "jpn": "OCR を開始できませんでした。次のフォルダーに言語データ (.traineddata) があるか確認してください:",
-    "eng": "OCR could not start. Please check that this folder contains the language data (.traineddata) files:"
-  },
   "Unsaved changes will be discarded. Continue?": {
     "uly": "Saqlanmighan özgirishler tashliwétilidu. Dawamlashturamsiz?",
     "jpn": "保存していない変更は破棄されます。続けますか?",
@@ -206,11 +196,6 @@
     "uly": "Imla ambirini oqughili bolmidi.",
     "jpn": "綴り辞書を読み込めませんでした。",
     "eng": "The spelling dictionary could not be loaded."
-  },
-  "Uyghurche OCR(Resimdiki Yéziqni Tonush) Programmisi": {
-    "uly": "Uyghurche {OCR}(Resimdiki Yéziqni Tonush) Programmisi",
-    "jpn": "ウイグル語 OCR（画像の文字認識）",
-    "eng": "Uyghur OCR (Text Recognition in Images)"
   },
   "Buningda töwendiki Ochuq Kodlar ishlitildi": {
     "jpn": "このプログラムは次のオープンソースのコードを使っています",
@@ -315,10 +300,6 @@
   "Höjjet közniki almashqanda shu köznektiki yéziqqa mas kélidighan Imla Tekshürgüchni aktiplaydu": {
     "jpn": "タブを切り替えたとき、そのタブの文字に合った綴りの検査を有効にします",
     "eng": "When you switch tabs, turns on the spell checker for the script of that tab"
-  },
-  "Resimni yéziqqa aylanduridu": {
-    "jpn": "画像を文字に変換します",
-    "eng": "Converts an image to text"
   },
   "Hazirqi höjjet yaki Tallan’ghan rayondiki Latinchini Uyghurchigha aylanduridu": {
     "jpn": "現在の文書または選択範囲のラテン文字をウイグル文字に変換します",
@@ -544,61 +525,9 @@
     "jpn": "見つかりません",
     "eng": "Not found"
   },
-  "Bu yerni chékip resimni éching yaki resimni tutup bu köznekke tashlang.": {
-    "jpn": "ここをクリックして画像を開くか、画像をこのウィンドウにドラッグしてください。",
-    "eng": "Click here to open an image, or drag an image onto this window."
-  },
-  "Resim körün’gende, Chashqinek bilen tonutidighan da’irini tallang.": {
-    "jpn": "画像が表示されたら、認識する範囲をマウスで選んでください。",
-    "eng": "When the image appears, select the area to recognize with the mouse."
-  },
-  "Tonu": {
-    "jpn": "認識",
-    "eng": "Recognize"
-  },
-  "Tonuydighan Tillar": {
-    "jpn": "認識する言語",
-    "eng": "Languages"
-  },
-  "Bet Qurulmisi": {
-    "jpn": "ページレイアウト",
-    "eng": "Page layout"
-  },
-  "Uyghurche": {
-    "jpn": "ウイグル語",
-    "eng": "Uyghur"
-  },
-  "In’glizche": {
-    "jpn": "英語",
-    "eng": "English"
-  },
-  "Türkche": {
-    "jpn": "トルコ語",
-    "eng": "Turkish"
-  },
-  "Xenzuche": {
-    "jpn": "中国語",
-    "eng": "Chinese"
-  },
-  "Silawiyanche": {
-    "jpn": "ロシア語",
-    "eng": "Russian"
-  },
-  "Özüng Tap": {
-    "jpn": "自動",
-    "eng": "Automatic"
-  },
-  "Birla Bölek": {
-    "jpn": "単一ブロック",
-    "eng": "Single block"
-  },
   "Orun": {
     "jpn": "位置",
     "eng": "Position"
-  },
-  "neshrini ishletken": {
-    "jpn": "Tesseract {0} を使用",
-    "eng": "using Tesseract {0}"
   },
   "Theme": {
     "uly": "Körünüsh",

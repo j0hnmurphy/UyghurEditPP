@@ -25,7 +25,7 @@ namespace UyghurEditPP
 		static readonly ConditionalWeakTable<Control, Kona> gKona = new ConditionalWeakTable<Control, Kona>();
 		static readonly ConditionalWeakTable<Form, object> gTitleHooked = new ConditionalWeakTable<Form, object>();
 
-		/// <summary>A window of its own (OCR, About ...): its colors and its title bar.</summary>
+		/// <summary>A window of its own (About, keyboard ...): its colors and its title bar.</summary>
 		public static void Apply(Form form, UiTheme theme)
 		{
 			ApplyControls(form, theme);
@@ -33,7 +33,7 @@ namespace UyghurEditPP
 				UiTheme.SetTitleBar(form.Handle, theme.IsDark);
 			}
 			// A window gets a new handle when it is created, and again when its right-to-left
-			// layout changes (OCR in the UEY UI); give each new handle the title bar too.
+			// layout changes; give each new handle the title bar too.
 			object hooked;
 			if(!gTitleHooked.TryGetValue(form, out hooked)){
 				gTitleHooked.Add(form, form);
