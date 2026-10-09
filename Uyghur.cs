@@ -1932,17 +1932,22 @@ public class Uyghur
 			eslitxt = eslitxt.Substring(0, 5000);
 		}
 		eslitxt = eslitxt.Replace(Uyghur.Sozghuch, "");
+		// Count letters only. Punctuation, digits and symbols (the backtick, Arabic comma,
+		// Arabic-Indic digits) say nothing about the script. The whole Arabic and Cyrillic
+		// blocks are used because UEY and USY letters lie outside their first 128 code
+		// points (e.g. U+0686, U+06D5, U+06C7 and U+04D9, U+04E9; see UEYHerpler and
+		// USYHerpler).
 		foreach (char Herp in eslitxt)
 		{
-			if ((Herp >= 0x0041 && Herp <= 0x005A) || (Herp >= 0x0060 && Herp <= 0x007a))
+			if ((Herp >= 'A' && Herp <= 'Z') || (Herp >= 'a' && Herp <= 'z') || "ÉÖÜéöü".IndexOf(Herp) != -1)
 			{
 				cntULY++;
 			}
-			else if (Herp >= 0x0600 && Herp < 0x067F)
+			else if (Herp >= 0x0600 && Herp <= 0x06FF && char.IsLetter(Herp))
 			{
 				cntUEY++;
 			}
-			else if (Herp >= 0x0400 && Herp < 0x047F)
+			else if (Herp >= 0x0400 && Herp <= 0x04FF && char.IsLetter(Herp))
 			{
 				cntUSY++;
 			}
