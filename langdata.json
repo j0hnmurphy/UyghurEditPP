@@ -573,9 +573,5 @@
     "uly": "Qayta sina",
     "jpn": "再試行(&R)",
     "eng": "&Retry"
-  },
-  "Resimdiki tékistlerni tonush (OCR) üchün UyghurOCR ni ishliting.": {
-    "jpn": "画像の中の文字の読み取り（OCR）には UyghurOCR を使ってください。",
-    "eng": "To recognize text in images (OCR), use UyghurOCR."
   }
 }
