@@ -1905,13 +1905,6 @@ namespace UyghurEditPP
 			menuYeziqAuto.Checked = gYeziqAuto;
 
 			Uyghur.YEZIQ curYeziq = YeziqniBayqa(gEditor);
-			if(curYeziq == Uyghur.YEZIQ.UEY){
-				menuBelge.Enabled = true;
-			}
-			else{
-				menuBelge.Enabled = true;
-			}
-			
 			if((menuImlaUEY.Checked && curYeziq == Uyghur.YEZIQ.UEY)||
 			   (menuImlaULY.Checked && curYeziq == Uyghur.YEZIQ.ULY)||
 			   (menuImlaUSY.Checked && curYeziq == Uyghur.YEZIQ.USY)
@@ -2407,16 +2400,6 @@ namespace UyghurEditPP
 			}
 		}
 		
-		void MenuQoralDropDownOpened(object sender, EventArgs e)
-		{
-			Uyghur.YEZIQ curYeziq = YeziqniBayqa(gEditor);
-			if(curYeziq == Uyghur.YEZIQ.UEY){
-				menuTiz.Enabled = true;
-			}
-			else{
-				menuTiz.Enabled = true;
-			}
-		}
 		void MenuHKodDropDownOpened(object sender, EventArgs e)
 		{
 			if(gEditor.Encoding!=null){
