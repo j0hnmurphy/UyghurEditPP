@@ -154,10 +154,25 @@ namespace UyghurEditPP
 		[System.Runtime.InteropServices.DllImport("dwmapi.dll")]
 		static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 		const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+		const int DWMWA_CAPTION_COLOR = 35;
+
+		/// <summary>The color as a Win32 COLORREF (0x00BBGGRR).</summary>
+		internal static int ColorRef(Color c)
+		{
+			return c.R | (c.G << 8) | (c.B << 16);
+		}
 
 		/// <summary>
-		/// Dark or light title bar. Only on Windows 11 (build 22000) or later, where this window
-		/// attribute is documented; Windows 10 keeps the light title bar.
+		/// Dark or light title bar. Only on Windows 11 (build 22000) or later, where these window
+		/// attributes are documented; Windows 10 keeps the light title bar.
+		///
+		/// The caption gets the bar color of the theme (the color of the menu bar right under it).
+		/// With the system caption color, Windows 11 draws the caption one pixel wider on each
+		/// side than the window body: it also covers the one-pixel border column, which the body
+		/// leaves empty (measured on Windows 11 25H2, also on a plain Windows Forms window; the
+		/// system message box had the same step). A caption with its own color is drawn as wide as
+		/// the body, so the step goes away. DWMWA_BORDER_COLOR (34) did not change it.
+		/// DWMWA_CAPTION_COLOR: https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute
 		/// </summary>
 		public static void SetTitleBar(IntPtr hwnd, bool dark)
 		{
@@ -165,8 +180,10 @@ namespace UyghurEditPP
 				return;
 			}
 			int value = dark ? 1 : 0;
+			int caption = ColorRef((dark ? Dark : Light).Bar);
 			try{
 				DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref value, sizeof(int));
+				DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, ref caption, sizeof(int));
 			}
 			catch(Exception ee){
 				System.Diagnostics.Debug.WriteLine(ee);
