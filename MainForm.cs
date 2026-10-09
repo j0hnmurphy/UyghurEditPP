@@ -1212,8 +1212,9 @@ namespace UyghurEditPP
 				filename = Path.GetFullPath(filename);
 			}
 			// Images used to open in the text recognition window, which is now a separate
-			// program; an image is not opened as text.
+			// program; an image is not opened as text, and the user is pointed to that program.
 			if(IsImageFile(filename)){
+				CenteredMessageBox.Show(this, gLang.GetText("Resimdiki tékistlerni tonush (OCR) üchün UyghurOCR ni ishliting."), "UyghurEdit++ v"+ GetVersion(), MessageBoxButtons.OK, MessageBoxIcon.Information);
 				return;
 			}
 			AddNew(filename);
