@@ -1066,7 +1066,6 @@ namespace UyghurEditPP
             this.menuQoral.Size = new System.Drawing.Size(61, 19);
             this.menuQoral.Text = "Qorallar";
             this.menuQoral.DropDownClosed += new System.EventHandler(this.DropDownMenusClosed);
-            this.menuQoral.DropDownOpened += new System.EventHandler(this.MenuQoralDropDownOpened);
             // 
             // menuTiz
             // 

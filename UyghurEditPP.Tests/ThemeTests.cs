@@ -17,6 +17,15 @@ namespace UyghurEditPP.Tests
 			Directory.CreateDirectory(gFolder);
 		}
 
+		// The caption color is passed to DWM as a COLORREF: 0x00BBGGRR.
+		[TestMethod]
+		public void ColorRef_IsBlueGreenRed()
+		{
+			Assert.AreEqual(0x00332211, UiTheme.ColorRef(System.Drawing.Color.FromArgb(0x11, 0x22, 0x33)));
+			Assert.AreEqual(0x00F5F5F5, UiTheme.ColorRef(UiTheme.Light.Bar));
+			Assert.AreEqual(0x002B2B2B, UiTheme.ColorRef(UiTheme.Dark.Bar));
+		}
+
 		[TestCleanup]
 		public void TearDown()
 		{

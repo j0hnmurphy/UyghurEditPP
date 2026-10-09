@@ -619,5 +619,30 @@
     "uly": "{Windows} bilen birdek",
     "jpn": "Windows の設定に従う",
     "eng": "Follow Windows"
+  },
+  "OK": {
+    "uly": "Tamam",
+    "jpn": "OK",
+    "eng": "OK"
+  },
+  "Cancel": {
+    "uly": "Waz kech",
+    "jpn": "キャンセル",
+    "eng": "Cancel"
+  },
+  "Yes": {
+    "uly": "He’e",
+    "jpn": "はい(&Y)",
+    "eng": "&Yes"
+  },
+  "No": {
+    "uly": "Yaq",
+    "jpn": "いいえ(&N)",
+    "eng": "&No"
+  },
+  "Retry": {
+    "uly": "Qayta sina",
+    "jpn": "再試行(&R)",
+    "eng": "&Retry"
   }
 }
