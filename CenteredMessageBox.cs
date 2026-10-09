@@ -27,9 +27,14 @@ namespace UyghurEditPP
 		/// <summary>Show with the caption as given (Show marks a Latin caption for right-to-left text).</summary>
 		internal static DialogResult ShowHere(IWin32Window owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
 		{
+			// A window that is closed or not created yet cannot own the box.
+			Control control = owner as Control;
+			if(control != null && (control.IsDisposed || !control.IsHandleCreated)){
+				owner = null;
+				control = null;
+			}
 			// A window may only be used on its own thread: from another thread (an error in a
 			// background task) the box is shown on the main window's thread.
-			Control control = owner as Control;
 			if(control == null){
 				control = UiThreadWindow();
 				if(control != null && !control.InvokeRequired){
@@ -37,14 +42,11 @@ namespace UyghurEditPP
 				}
 			}
 			if(control != null && control.InvokeRequired){
-				try{
-					Control target = control;
-					return (DialogResult)target.Invoke(new Func<DialogResult>(() => ShowHere(target, text, caption, buttons, icon)));
+				DialogResult result;
+				if(TryShowOn(control, text, caption, buttons, icon, out result)){
+					return result;
 				}
-				catch(Exception ee){
-					System.Diagnostics.Debug.WriteLine(ee);
-					owner = null;   // the window is gone: show the system box without an owner
-				}
+				owner = null;   // the UI thread does not answer: the system box without an owner
 			}
 			else if(owner != null || System.Threading.Thread.CurrentThread.GetApartmentState() == System.Threading.ApartmentState.STA){
 				try{
@@ -55,6 +57,63 @@ namespace UyghurEditPP
 				}
 			}
 			return SystemBox(owner, text, caption, buttons, icon);
+		}
+
+		/// <summary>A window handle (e.g. of a WPF window) as an owner; null for no handle.</summary>
+		public static IWin32Window Wrap(IntPtr hwnd)
+		{
+			return hwnd == IntPtr.Zero ? null : new HandleOwner(hwnd);
+		}
+
+		sealed class HandleOwner : IWin32Window
+		{
+			readonly IntPtr gHandle;
+			public HandleOwner(IntPtr handle) { gHandle = handle; }
+			public IntPtr Handle { get { return gHandle; } }
+		}
+
+		// How long another thread waits for the UI thread to start showing the box. The UI
+		// thread may be busy or blocked (the error may have come from a wait on it); then the
+		// system box is shown instead of waiting for ever.
+		const int UiStartTimeoutMs = 5000;
+
+		/// <summary>
+		/// Shows the box on the thread of window, from another thread. False when the UI thread
+		/// did not start showing it in time or the window is gone; the queued call then does
+		/// nothing when it runs later.
+		/// </summary>
+		static bool TryShowOn(Control window, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, out DialogResult result)
+		{
+			result = DialogResult.None;
+			int state = 0;   // 0 waiting, 1 started on the UI thread, 2 given up
+			IAsyncResult call;
+			// Not disposed: the queued call may still set it after this method has given up.
+			System.Threading.ManualResetEvent started = new System.Threading.ManualResetEvent(false);
+			try{
+				call = window.BeginInvoke(new Func<DialogResult>(() => {
+					if(System.Threading.Interlocked.CompareExchange(ref state, 1, 0) != 0){
+						return DialogResult.None;   // the other thread gave up
+					}
+					started.Set();
+					return ShowHere(window, text, caption, buttons, icon);
+				}));
+			}
+			catch(Exception ee){
+				System.Diagnostics.Debug.WriteLine(ee);
+				return false;
+			}
+			if(!started.WaitOne(UiStartTimeoutMs) && System.Threading.Interlocked.CompareExchange(ref state, 2, 0) == 0){
+				return false;
+			}
+			// Started: the box is open on the UI thread; wait for the user's answer.
+			try{
+				result = (DialogResult)window.EndInvoke(call);
+				return true;
+			}
+			catch(Exception ee){
+				System.Diagnostics.Debug.WriteLine(ee);
+				return false;
+			}
 		}
 
 		// The main window from any thread (MainWindow only gives it on its own thread).

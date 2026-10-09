@@ -59,6 +59,47 @@ namespace UyghurEditPP.Tests
 		}
 
 		[TestMethod]
+		public void IconBitmap_HasTheAskedSize_AndNoneWithoutIcon()
+		{
+			foreach(int size in new[] { 32, 40, 48, 64 }){
+				using(System.Drawing.Bitmap b = ThemedMessageBox.IconBitmap(MessageBoxIcon.Error, size)){
+					Assert.AreEqual(size, b.Width);
+					Assert.AreEqual(size, b.Height);
+				}
+			}
+			Assert.IsNull(ThemedMessageBox.IconBitmap(MessageBoxIcon.None, 32));
+		}
+
+		// At 32 pixels the icons are the system message box icons (SystemIcons).
+		[TestMethod]
+		public void IconBitmap_At32_IsTheSystemIcon()
+		{
+			Check(MessageBoxIcon.Error, System.Drawing.SystemIcons.Error);
+			Check(MessageBoxIcon.Warning, System.Drawing.SystemIcons.Warning);
+			Check(MessageBoxIcon.Question, System.Drawing.SystemIcons.Question);
+			Check(MessageBoxIcon.Information, System.Drawing.SystemIcons.Information);
+		}
+
+		static void Check(MessageBoxIcon icon, System.Drawing.Icon expected)
+		{
+			using(System.Drawing.Bitmap a = ThemedMessageBox.IconBitmap(icon, 32))
+			using(System.Drawing.Bitmap b = expected.ToBitmap()){
+				for(int y = 0; y < 32; y++){
+					for(int x = 0; x < 32; x++){
+						Assert.AreEqual(b.GetPixel(x, y), a.GetPixel(x, y), icon + " at " + x + "," + y);
+					}
+				}
+			}
+		}
+
+		[TestMethod]
+		public void Wrap_GivesTheHandle_AndNullForNone()
+		{
+			Assert.IsNull(CenteredMessageBox.Wrap(System.IntPtr.Zero));
+			Assert.AreEqual(new System.IntPtr(1234), CenteredMessageBox.Wrap(new System.IntPtr(1234)).Handle);
+		}
+
+		[TestMethod]
 		public void Sound_FollowsTheIcon()
 		{
 			Assert.AreSame(SystemSounds.Hand, ThemedMessageBox.Sound(MessageBoxIcon.Error));

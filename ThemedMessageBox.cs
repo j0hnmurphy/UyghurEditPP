@@ -88,6 +88,50 @@ namespace UyghurEditPP
 			}
 		}
 
+		// The icon resource in user32.dll that the system message box icon comes from (0 for
+		// none). Checked on Windows 11 26200: at 32 pixels these are the same images as
+		// SystemIcons.Warning/Question/Error/Information. (LoadIconWithScaleDown would need
+		// comctl32 version 6, which the program's P/Invoke calls do not get.)
+		static int IconId(MessageBoxIcon icon)
+		{
+			switch(icon){
+				case MessageBoxIcon.Warning: return 101;
+				case MessageBoxIcon.Question: return 102;
+				case MessageBoxIcon.Error: return 103;
+				case MessageBoxIcon.Information: return 104;
+				default: return 0;
+			}
+		}
+
+		/// <summary>
+		/// The system icon drawn at size pixels, from the icon's own image of that size (or the
+		/// nearest one), so it stays sharp at 125-200%; a scaled 32-pixel copy when that fails.
+		/// </summary>
+		internal static Bitmap IconBitmap(MessageBoxIcon icon, int size)
+		{
+			int id = IconId(icon);
+			if(id == 0){
+				return null;
+			}
+			IntPtr hicon = LoadImage(GetModuleHandle("user32.dll"), new IntPtr(id), IMAGE_ICON, size, size, 0);
+			if(hicon != IntPtr.Zero){
+				try{
+					using(Icon i = Icon.FromHandle(hicon)){
+						return i.ToBitmap();
+					}
+				}
+				finally{
+					DestroyIcon(hicon);
+				}
+			}
+			Bitmap scaled = new Bitmap(size, size);
+			using(Graphics g = Graphics.FromImage(scaled)){
+				g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+				g.DrawIcon(SystemIcon(icon), new Rectangle(0, 0, size, size));
+			}
+			return scaled;
+		}
+
 		static Icon SystemIcon(MessageBoxIcon icon)
 		{
 			switch(icon){
@@ -145,9 +189,10 @@ namespace UyghurEditPP
 			// UKIJ Tuz for the Uyghur scripts (as the menus).
 			string lang = MainForm.gLang != null ? MainForm.gLang.LanguaID : "uly";
 			if("eng".Equals(lang) || "jpn".Equals(lang)){
-				Font f = SystemFonts.MessageBoxFont;
-				gFontName = f.Name;
-				gPointSize = f.SizeInPoints;
+				using(Font f = SystemFonts.MessageBoxFont){   // a new Font on every call
+					gFontName = f.Name;
+					gPointSize = f.SizeInPoints;
+				}
 			}
 			else{
 				gFontName = "UKIJ Tuz";
@@ -167,7 +212,8 @@ namespace UyghurEditPP
 			Controls.Add(gBody);
 			Controls.Add(gBand);
 
-			ButtonSpec[] specs = Buttons(buttons);
+			// ShowBox refuses the sets that are not drawn; an OK button keeps the box usable anyway.
+			ButtonSpec[] specs = Buttons(buttons) ?? Buttons(MessageBoxButtons.OK);
 			gButtonControls = new Button[specs.Length];
 			DialogResult escape = EscapeResult(buttons);
 			for(int i = 0; i < specs.Length; i++){
@@ -324,23 +370,39 @@ namespace UyghurEditPP
 		/// Sizes and places everything for a DPI. The font is made in pixels for that DPI, so
 		/// the measured text matches the monitor the box is on.
 		/// </summary>
+		// The size of a large icon at a DPI (32 at 100%), as Windows gives it.
+		int IconSizeFor(int dpi)
+		{
+			try{
+				int size = GetSystemMetricsForDpi(SM_CXICON, (uint)dpi);
+				if(size > 0){
+					return size;
+				}
+			}
+			catch(EntryPointNotFoundException){
+				// before Windows 10 1607
+			}
+			return Px(IconSize96, dpi);
+		}
+
 		void Relayout(int dpi, bool center)
 		{
+			// Every control gets the new font before the old one is disposed.
 			Font old = gFont;
 			gFont = AppFonts.Create(gFontName, gPointSize * dpi / 72f, FontStyle.Regular, GraphicsUnit.Pixel);
 			Font = gFont;
 			gLabel.Font = gFont;
+			foreach(Button b in gButtonControls){
+				b.Font = gFont;
+			}
 			if(old != null){
 				old.Dispose();
 			}
 
-			Icon sys = SystemIcon(gIcon);
-			int icon = sys != null ? Px(IconSize96, dpi) : 0;
-			if(sys != null){
+			int icon = IconId(gIcon) != 0 ? IconSizeFor(dpi) : 0;
+			if(icon > 0){
 				Image oldImage = gPicture.Image;
-				using(Icon sized = new Icon(sys, icon, icon)){
-					gPicture.Image = sized.ToBitmap();
-				}
+				gPicture.Image = IconBitmap(gIcon, icon);
 				if(oldImage != null){
 					oldImage.Dispose();
 				}
@@ -394,7 +456,6 @@ namespace UyghurEditPP
 			int x = clientWidth - Px(BandPadding96, dpi);
 			for(int i = gButtonControls.Length - 1; i >= 0; i--){
 				x -= bw[i];
-				gButtonControls[i].Font = gFont;
 				Place(gButtonControls[i], x, Px(BandPadding96, dpi), bw[i], bh, clientWidth);
 				x -= bgap;
 			}
@@ -466,15 +527,18 @@ namespace UyghurEditPP
 
 		protected override void Dispose(bool disposing)
 		{
+			// The controls are disposed first; the image and font they used after them.
+			Image image = disposing ? gPicture.Image : null;
+			base.Dispose(disposing);
 			if(disposing){
-				if(gPicture.Image != null){
-					gPicture.Image.Dispose();
+				if(image != null){
+					image.Dispose();
 				}
 				if(gFont != null){
 					gFont.Dispose();
+					gFont = null;
 				}
 			}
-			base.Dispose(disposing);
 		}
 
 		[StructLayout(LayoutKind.Sequential)]
@@ -482,6 +546,16 @@ namespace UyghurEditPP
 
 		[DllImport("user32.dll")]
 		static extern uint GetDpiForWindow(IntPtr hwnd);
+		[DllImport("user32.dll")]
+		static extern int GetSystemMetricsForDpi(int nIndex, uint dpi);
+		const int SM_CXICON = 11;
+		[DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+		static extern IntPtr GetModuleHandle(string lpModuleName);
+		[DllImport("user32.dll")]
+		static extern IntPtr LoadImage(IntPtr hinst, IntPtr name, uint type, int cx, int cy, uint fuLoad);
+		const uint IMAGE_ICON = 1;
+		[DllImport("user32.dll")]
+		static extern bool DestroyIcon(IntPtr hIcon);
 		[DllImport("user32.dll")]
 		static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 		[DllImport("user32.dll")]

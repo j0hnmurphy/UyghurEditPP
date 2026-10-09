@@ -249,10 +249,11 @@ namespace UyghurEditPP.FindReplace
 		{
 			string repText = Regex.Unescape(txtReplace.Text);
 			string msg = MainForm.gLang.GetText("Rastla barliq «") + txtFind.Text + MainForm.gLang.GetText("» ni «") +  txtReplace.Text + MainForm.gLang.GetText("» gha alamshturamsiz?");
-			// Centered on the editor window, like the other message boxes.
-			System.Windows.Forms.IWin32Window mainWindow = CenteredMessageBox.MainWindow;
+			// Owned by (and centered on) this find window, so it stays above it and the
+			// window cannot be used while the question is open.
+			System.Windows.Forms.IWin32Window findWindow = CenteredMessageBox.Wrap(new System.Windows.Interop.WindowInteropHelper(this).Handle);
 			// The caption is Uyghur text, so it is not marked as a left-to-right run.
-			if (CenteredMessageBox.ShowHere(mainWindow, msg, MainForm.gLang.GetText("Hemmini Almashturush"),
+			if (CenteredMessageBox.ShowHere(findWindow ?? CenteredMessageBox.MainWindow, msg, MainForm.gLang.GetText("Hemmini Almashturush"),
 				System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.Yes)
 			{
 				Cursor old = Mouse.OverrideCursor;
