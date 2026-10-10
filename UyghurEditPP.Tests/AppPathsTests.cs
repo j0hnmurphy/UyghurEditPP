@@ -82,6 +82,26 @@ namespace UyghurEditPP.Tests
 		}
 
 		[TestMethod]
+		public void ChooseDataFolder_WithAppData_IsAppDataUyghurEditPP()
+		{
+			Assert.AreEqual(Path.Combine("A", "UyghurEditPP"), AppPaths.ChooseDataFolder("A", "P", false, "T"));
+			Assert.AreEqual(Path.Combine("A", "UyghurEditPP"), AppPaths.ChooseDataFolder("A", "P", true, "T"));
+		}
+
+		[TestMethod]
+		public void ChooseDataFolder_NoAppDataNotPackaged_IsTheProgramFolder()
+		{
+			Assert.AreEqual("P", AppPaths.ChooseDataFolder("", "P", false, "T"));
+			Assert.AreEqual("P", AppPaths.ChooseDataFolder(null, "P", false, "T"));
+		}
+
+		[TestMethod]
+		public void ChooseDataFolder_NoAppDataPackaged_NeverUsesTheProgramFolder()
+		{
+			Assert.AreEqual(Path.Combine("T", "UyghurEditPP"), AppPaths.ChooseDataFolder("", "P", true, "T"));
+		}
+
+		[TestMethod]
 		public void DeleteOldLogs_RemovesOnlyOldErrorLogs()
 		{
 			string old = Path.Combine(gOld, "error-20200101.log");

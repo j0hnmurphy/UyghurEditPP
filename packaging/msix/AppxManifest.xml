@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AppxManifest template for UyghurEdit++. scripts/build-msix.ps1 replaces the double-underscore placeholders.
+  Structure follows https://learn.microsoft.com/en-us/windows/msix/desktop/desktop-to-uwp-manual-conversion
+  and the file type association example in
+  https://learn.microsoft.com/en-us/windows/apps/desktop/modernize/desktop-to-uwp-extensions
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap2="http://schemas.microsoft.com/appx/manifest/uap/windows10/2"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap2 uap3 rescap">
+  <!-- Name and Publisher must match the values Partner Center shows after the name is reserved. -->
+  <Identity Name="__IDENTITY_NAME__" Publisher="__PUBLISHER__" Version="__VERSION__" ProcessorArchitecture="x64" />
+  <Properties>
+    <DisplayName>UyghurEdit++</DisplayName>
+    <PublisherDisplayName>__PUBLISHER_DISPLAY_NAME__</PublisherDisplayName>
+    <Description>A free text editor for writing Uyghur, with spell checking and script conversion.</Description>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+  <Resources>
+    <Resource Language="en-us" />
+    <Resource Language="ja-jp" />
+  </Resources>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+  <Applications>
+    <!-- EntryPoint="Windows.FullTrustApplication" is equivalent to uap10:RuntimeBehavior="packagedClassicApp"
+         with uap10:TrustLevel="mediumIL", and also works before Windows 10 version 2004 (see the Application
+         element reference: https://learn.microsoft.com/en-us/uwp/schemas/appxpackage/uapmanifestschema/element-application). -->
+    <Application Id="UyghurEditPP" Executable="UyghurEditPP.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="UyghurEdit++"
+        Description="A free text editor for writing Uyghur, with spell checking and script conversion."
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png"
+        BackgroundColor="transparent">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" Square71x71Logo="Assets\Square71x71Logo.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap3:FileTypeAssociation Name="uyghureditfiles">
+            <uap:SupportedFileTypes>
+              <uap:FileType>.uut</uap:FileType>
+              <uap:FileType>.txt</uap:FileType>
+            </uap:SupportedFileTypes>
+            <uap2:SupportedVerbs>
+              <!-- A full-trust app gets the verb's Parameters as its command line; %1 is the file path (quoted). -->
+              <uap3:Verb Id="open" Parameters="&quot;%1&quot;">Open</uap3:Verb>
+            </uap2:SupportedVerbs>
+          </uap3:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+</Package>
