@@ -10,6 +10,7 @@
  */
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace UyghurEditPP
@@ -29,12 +30,60 @@ namespace UyghurEditPP
 		/// </summary>
 		public static string DataFolder{
 			get{
-				string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-				if(string.IsNullOrEmpty(appData)){
-					// No profile folder (rare service/locked-down accounts): use the program folder as before.
-					return ProgramFolder;
-				}
+				return ChooseDataFolder(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ProgramFolder, IsPackaged, Path.GetTempPath());
+			}
+		}
+
+		/// <summary>
+		/// Picks the data folder: %AppData%\UyghurEditPP when there is a profile folder.
+		/// Without one the program folder is used as before, except in a packaged (MSIX)
+		/// install, where the program folder is read-only: then a folder under tempFolder.
+		/// </summary>
+		public static string ChooseDataFolder(string appData, string programFolder, bool packaged, string tempFolder)
+		{
+			if(!string.IsNullOrEmpty(appData)){
 				return Path.Combine(appData, "UyghurEditPP");
+			}
+			// No profile folder (rare service/locked-down accounts).
+			if(packaged){
+				return Path.Combine(tempFolder, "UyghurEditPP");
+			}
+			return programFolder;
+		}
+
+		static bool gPackagedChecked;
+		static bool gPackaged;
+
+		/// <summary>
+		/// True when running with package identity (installed from the MSIX package).
+		/// </summary>
+		public static bool IsPackaged{
+			get{
+				if(!gPackagedChecked){
+					gPackaged = DetectPackaged();
+					gPackagedChecked = true;
+				}
+				return gPackaged;
+			}
+		}
+
+		const int ErrorInsufficientBuffer = 122;
+
+		[DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+		static extern int GetCurrentPackageFullName(ref int packageFullNameLength, StringBuilder packageFullName);
+
+		static bool DetectPackaged()
+		{
+			try{
+				// With a null buffer the call fails with ERROR_INSUFFICIENT_BUFFER when the process
+				// has a package, and with APPMODEL_ERROR_NO_PACKAGE when it has not. See
+				// https://learn.microsoft.com/en-us/windows/win32/api/appmodel/nf-appmodel-getcurrentpackagefullname
+				int length = 0;
+				return GetCurrentPackageFullName(ref length, null) == ErrorInsufficientBuffer;
+			}
+			catch(EntryPointNotFoundException){
+				// Windows 7: no package support at all.
+				return false;
 			}
 		}
 

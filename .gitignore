@@ -9,3 +9,7 @@ packages/
 .vs/
 *.user
 *.suo
+
+# MSIX packaging output
+packaging/msix/Output/
+packaging/msix/staging/
