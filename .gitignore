@@ -9,3 +9,6 @@ packages/
 .vs/
 *.user
 *.suo
+
+# Installer output
+installer/Output/
