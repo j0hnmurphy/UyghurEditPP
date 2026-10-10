@@ -13,3 +13,5 @@ packages/
 # MSIX packaging output
 packaging/msix/Output/
 packaging/msix/staging/
+# Installer output
+installer/Output/
