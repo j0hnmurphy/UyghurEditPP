@@ -23,6 +23,40 @@ namespace UyghurEditPP
 			get{ return LogicalToDeviceUnits(14); }
 		}
 
+		// TabControl scales neither ItemSize nor Padding, at startup or on a DPI change. Scale them
+		// from the values at 100% (the designer's) by the total factor, so changes back and forth
+		// do not add up rounding errors. Padding stays at 100% and is scaled in WndProc: setting
+		// it recreates the handle, and with it the editors in the tabs.
+		private Size _logicalItemSize;
+		private SizeF _scale = new SizeF(1f, 1f);
+		private bool _scaled;
+
+		protected override void ScaleControl(SizeF factor, BoundsSpecified specified)
+		{
+			base.ScaleControl(factor, specified);
+			if (!_scaled)
+			{
+				_logicalItemSize = ItemSize;
+				_scaled = true;
+			}
+			_scale = new SizeF(_scale.Width * factor.Width, _scale.Height * factor.Height);
+			if (IsHandleCreated)
+				SendMessage(Handle, TCM_SETPADDING, IntPtr.Zero, MAKELPARAM(Padding.X, Padding.Y));
+			// Also makes the tabs measure themselves again with the new padding.
+			ItemSize = new Size(Scaled(_logicalItemSize.Width, _scale.Width), Scaled(_logicalItemSize.Height, _scale.Height));
+		}
+
+		/// <summary>The padding of the tabs in pixels (Padding is at 100%).</summary>
+		internal Point ScaledPadding
+		{
+			get{ return new Point(Scaled(Padding.X, _scale.Width), Scaled(Padding.Y, _scale.Height)); }
+		}
+
+		private static int Scaled(int value, float scale)
+		{
+			return (int)Math.Round(value * (double)scale, MidpointRounding.AwayFromZero);
+		}
+
 		private int HotTabIndex
 		{
 			get{ return _hotTabIndex; }
@@ -97,7 +131,7 @@ namespace UyghurEditPP
 		protected override void WndProc(ref Message m)
 		{
 			if (m.Msg == TCM_SETPADDING)
-				m.LParam = MAKELPARAM(this.Padding.X + CloseButtonHeight / 2, this.Padding.Y);
+				m.LParam = MAKELPARAM(ScaledPadding.X + CloseButtonHeight / 2, ScaledPadding.Y);
 
 			if (m.Msg == WM_MOUSEDOWN && !this.DesignMode && HotTabIndex>=0)
 			{
@@ -194,7 +228,7 @@ namespace UyghurEditPP
 					}
 					if (tabImage != null)
 					{
-						Rectangle imageRect = new Rectangle(Padding.X, 0, tabImage.Width, tabImage.Height);
+						Rectangle imageRect = new Rectangle(ScaledPadding.X, 0, tabImage.Width, tabImage.Height);
 						imageRect.Offset(0, (contentRect.Height - imageRect.Height) / 2);
 						bmGraphics.DrawImage(tabImage, imageRect);
 					}
