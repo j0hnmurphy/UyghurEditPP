@@ -162,7 +162,7 @@ namespace UyghurEditPP
 			| System.Windows.Forms.AnchorStyles.Right)));
 			this.linkLabel2.Location = new System.Drawing.Point(38, 136);
 			this.linkLabel2.Name = "linkLabel2";
-			this.linkLabel2.Size = new System.Drawing.Size(272, 23);
+			this.linkLabel2.Size = new System.Drawing.Size(399, 23);
 			this.linkLabel2.TabIndex = 14;
 			this.linkLabel2.TabStop = true;
 			this.linkLabel2.Text = "https://github.com/gheyret/UyghurEditPP/";
