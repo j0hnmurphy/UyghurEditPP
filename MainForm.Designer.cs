@@ -1278,10 +1278,8 @@ namespace UyghurEditPP
             // 
             // stBar
             // 
-            this.stBar.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this.stBar.AutoSize = false;
             this.stBar.BackColor = System.Drawing.SystemColors.Control;
-            this.stBar.Dock = System.Windows.Forms.DockStyle.None;
             this.stBar.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.stBarUchur,
             this.stBarQur,
@@ -1344,10 +1342,8 @@ namespace UyghurEditPP
             // 
             // mainTab
             // 
-            this.mainTab.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
             this.mainTab.Cursor = System.Windows.Forms.Cursors.Default;
+            this.mainTab.Dock = System.Windows.Forms.DockStyle.Fill;
             this.mainTab.HotTrack = true;
             this.mainTab.ItemSize = new System.Drawing.Size(0, 40);
             this.mainTab.Location = new System.Drawing.Point(0, 70);
@@ -1366,8 +1362,8 @@ namespace UyghurEditPP
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Dpi;
             this.AutoValidate = System.Windows.Forms.AutoValidate.EnableAllowFocusChange;
             this.ClientSize = new System.Drawing.Size(1006, 728);
-            this.Controls.Add(this.stBar);
             this.Controls.Add(this.mainTab);
+            this.Controls.Add(this.stBar);
             this.Controls.Add(this.toolBar);
             this.Controls.Add(this.menuBar);
             this.Font = new System.Drawing.Font("UKIJ Tuz", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));

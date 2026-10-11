@@ -759,12 +759,10 @@ namespace UyghurEditPP
 		{
 		}
 		
+		// The tabs and the status bar are docked: Windows Forms lays them out, also after it
+		// scales them for a DPI change; sizing them here as well scaled them twice.
 		void MainFormResize(object sender, EventArgs e)
 		{
-			mainTab.Location = new Point(0,toolBar.Bottom);
-			mainTab.Width = ClientSize.Width;
-			mainTab.Height = ClientSize.Height-(toolBar.Height + stBar.Height+menuBar.Height);
-			stBar.Location = new Point(0,mainTab.Bottom);
 			if(this.WindowState == FormWindowState.Minimized){
 				this.gFindReplace.HideMe();
 			}
