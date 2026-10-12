@@ -125,7 +125,7 @@ The files that were open when you closed the program are opened again at the nex
 # Automatic recovery (English)
 While you edit, UyghurEdit++ keeps a copy of every document with unsaved changes in `%AppData%\UyghurEditPP\recovery` (every 2 minutes, only when the text changed). The copy is deleted when you save or close the document and when the program exits normally. If the program, or Windows, ended abnormally, the next start asks whether to restore the unsaved documents; "No" deletes the copies. A copy is never deleted before it was offered; other files left in the folder (for example by a failed write) are deleted after 30 days. The copies are plain text files of your documents: delete the folder if you do not want them kept.
 
-To change the interval, add `"autosaveMinutes": 5` (a whole number of minutes; `0` turns it off) to `%AppData%\UyghurEditPP\uyghuredit.json` while the program is not running. In the Microsoft Store version the `%AppData%` folder is the package's private copy of it.
+To change the interval, add `"autosaveMinutes": 5` (a whole number of minutes; `0` turns it off) to `%AppData%\UyghurEditPP\uyghuredit.json` while the program is not running. The Microsoft Store version uses the same `%AppData%\UyghurEditPP` folder when it already exists (for example from the zip version); otherwise Windows keeps it in the package's private copy of `%AppData%`.
 
 # Ishlitilgen ochuq kodlar
 Avalonedit: https://github.com/icsharpcode/AvalonEdit
