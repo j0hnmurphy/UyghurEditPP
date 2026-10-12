@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.Reflection;
 using System.Windows.Forms;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -58,6 +59,86 @@ namespace UyghurEditPP.Tests
 					Assert.AreEqual(Round(11 * k), split.DropDownButtonWidth, at);
 				}
 				Assert.AreSame(icon, button.Image, "back at 100% the original image is used");
+			}
+		}
+
+		[System.Runtime.InteropServices.DllImport("user32.dll")]
+		static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+
+		class TestStrip : KenjiToolStrip
+		{
+			public void Rescale(int oldDpi, int newDpi)
+			{
+				RescaleConstantsForDpi(oldDpi, newDpi);
+			}
+		}
+
+		// On a real DPI change the strip first gets RescaleConstantsForDpi (WM_DPICHANGED_BEFOREPARENT),
+		// whose ResetScaling sets ImageScalingSize to 16 px at the new DPI, and then the form
+		// scales it (ScaleControl). The 100% size must survive that, round trip after round trip.
+		[TestMethod]
+		public void DpiChange_ThroughRescaleConstants_KeepsTheImageSize()
+		{
+			// The test host is not Per-Monitor V2 (the program is, by app.config), so Windows Forms
+			// would skip ResetScaling; switch on the same flags the program runs with.
+			Type dpiHelper = typeof(Form).Assembly.GetType("System.Windows.Forms.DpiHelper");
+			Assert.IsNotNull(dpiHelper.GetProperty("EnableToolStripPerMonitorV2HighDpiImprovements", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public).GetValue(null, null));   // initializes the flags
+			string[] flags = { "enableDpiChangedMessageHandling", "enableToolStripHighDpiImprovements", "enableDpiChangedHighDpiImprovements" };
+			object[] saved = new object[flags.Length];
+			for(int i = 0; i < flags.Length; i++){
+				FieldInfo f = dpiHelper.GetField(flags[i], BindingFlags.Static | BindingFlags.NonPublic);
+				saved[i] = f.GetValue(null);
+				f.SetValue(null, true);
+			}
+			try{
+				// ... and only on a Per-Monitor V2 thread (DpiHelper.EnableDpiChangedMessageHandling).
+				Exception error = null;
+				System.Threading.Thread t = new System.Threading.Thread(() => {
+					try{
+						Assert.AreNotEqual(IntPtr.Zero, SetThreadDpiAwarenessContext(new IntPtr(-4)), "PMv2 thread");
+						RescaleConstantsThenScale();
+					}
+					catch(Exception e){
+						error = e;
+					}
+				});
+				t.SetApartmentState(System.Threading.ApartmentState.STA);
+				t.Start();
+				t.Join();
+				if(error != null){
+					throw new AssertFailedException(error.Message, error);
+				}
+			}
+			finally{
+				for(int i = 0; i < flags.Length; i++){
+					dpiHelper.GetField(flags[i], BindingFlags.Static | BindingFlags.NonPublic).SetValue(null, saved[i]);
+				}
+			}
+		}
+
+		static void RescaleConstantsThenScale()
+		{
+			// What the framework does to a plain ToolStrip: 16 px at the new DPI.
+			using(ToolStrip plain = new ToolStrip()){
+				plain.ImageScalingSize = new Size(24, 24);
+				typeof(ToolStrip).GetMethod("RescaleConstantsForDpi", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(plain, new object[] { 96, 120 });
+				Assert.AreEqual(new Size(20, 20), plain.ImageScalingSize, "ResetScaling did not run: the test would not show the problem");
+			}
+			using(TestStrip strip = new TestStrip())
+			using(ToolStripSplitButton split = new ToolStripSplitButton()){
+				strip.ImageScalingSize = new Size(24, 24);
+				split.AutoSize = false;
+				split.Size = new Size(40, 29);
+				strip.Items.Add(split);
+				int dpi = 96;
+				foreach(int next in Steps){
+					strip.Rescale(dpi, next);
+					strip.Scale(new SizeF((float)next / dpi, (float)next / dpi));
+					dpi = next;
+					Assert.AreEqual(new Size(Round(24 * dpi / 96.0), Round(24 * dpi / 96.0)), strip.ImageScalingSize, "at " + dpi);
+					Assert.AreEqual(Round(11 * dpi / 96.0), split.DropDownButtonWidth, "at " + dpi);
+				}
+				Assert.AreEqual(new Size(24, 24), strip.ImageScalingSize);
 			}
 		}
 

@@ -23,6 +23,7 @@ namespace UyghurEditPP
 		readonly ToolStrip _strip;
 		SizeF _scale = new SizeF(1f, 1f);
 		Size _logicalImageScalingSize, _appliedImageScalingSize;
+		bool _haveImageScalingSize;
 		readonly Dictionary<ToolStripItem, Size> _logicalSizes = new Dictionary<ToolStripItem, Size>();
 		readonly Dictionary<ToolStripItem, Size> _appliedSizes = new Dictionary<ToolStripItem, Size>();
 		readonly Dictionary<ToolStripItem, Image> _originalImages = new Dictionary<ToolStripItem, Image>();
@@ -48,10 +49,14 @@ namespace UyghurEditPP
 		}
 
 		// The values at 100%: taken the first time, and again for anything set from outside since.
-		void Remember()
+		internal void Remember()
 		{
-			if (_strip.ImageScalingSize != _appliedImageScalingSize)
+			if (!_haveImageScalingSize || _strip.ImageScalingSize != _appliedImageScalingSize)
+			{
 				_logicalImageScalingSize = Unscaled(_strip.ImageScalingSize);
+				_appliedImageScalingSize = _strip.ImageScalingSize;
+				_haveImageScalingSize = true;
+			}
 			foreach (ToolStripItem item in _strip.Items)
 			{
 				Size applied;
@@ -62,10 +67,26 @@ namespace UyghurEditPP
 					&& (!_scaledImages.TryGetValue(item, out scaled) || !ReferenceEquals(scaled, item.Image)))
 				{
 					// The image as set (at 100%, or replaced since): keep it to scale from.
+					Image original;
+					if (scaled != null && !(_originalImages.TryGetValue(item, out original) && ReferenceEquals(scaled, original)))
+						scaled.Dispose();   // our scaled copy of the image that was replaced
 					_originalImages[item] = item.Image;
 					_scaledImages.Remove(item);
 				}
 			}
+		}
+
+		/// <summary>
+		/// ToolStrip.RescaleConstantsForDpi (on a DPI change of the window, and when the handle is
+		/// created on a monitor whose DPI is not the system DPI) calls ResetScaling, which sets
+		/// ImageScalingSize to 16 px at the new DPI. Put back the size this strip is laid out for.
+		/// </summary>
+		internal void RestoreImageScalingSize()
+		{
+			if (!_haveImageScalingSize)
+				return;
+			_strip.ImageScalingSize = Scaled(_logicalImageScalingSize);
+			_appliedImageScalingSize = _strip.ImageScalingSize;
 		}
 
 		void Apply()
@@ -164,6 +185,13 @@ namespace UyghurEditPP
 		{
 			base.ScaleControl(factor, specified);
 			Scaler.Scale(factor, specified);
+		}
+
+		protected override void RescaleConstantsForDpi(int deviceDpiOld, int deviceDpiNew)
+		{
+			Scaler.Remember();   // the sizes as they are, before ResetScaling overwrites ImageScalingSize
+			base.RescaleConstantsForDpi(deviceDpiOld, deviceDpiNew);
+			Scaler.RestoreImageScalingSize();
 		}
 	}
 }
