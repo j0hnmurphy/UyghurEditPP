@@ -82,6 +82,20 @@ namespace UyghurEditPP.Tests
 		}
 
 		[TestMethod]
+		public void DataFolder_FromTheEnvironmentVariable_OnlyWhenSet()
+		{
+			string folder = Path.Combine(Path.GetTempPath(), "UyghurEditPP.Tests", "env-data");
+			Environment.SetEnvironmentVariable(AppPaths.DataFolderVariable, folder);
+			try{
+				Assert.AreEqual(folder, AppPaths.DataFolder);
+			}
+			finally{
+				Environment.SetEnvironmentVariable(AppPaths.DataFolderVariable, null);
+			}
+			Assert.AreEqual(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "UyghurEditPP"), AppPaths.DataFolder);
+		}
+
+		[TestMethod]
 		public void ChooseDataFolder_WithAppData_IsAppDataUyghurEditPP()
 		{
 			Assert.AreEqual(Path.Combine("A", "UyghurEditPP"), AppPaths.ChooseDataFolder("A", "P", false, "T"));

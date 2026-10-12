@@ -42,10 +42,10 @@ namespace UyghurEditPP.Tests
 			return typeof(MainForm).GetField(name, BindingFlags.NonPublic | BindingFlags.Instance).GetValue(form);
 		}
 
-		static void Call(MainForm form, string name, params object[] args)
+		static object Call(MainForm form, string name, params object[] args)
 		{
 			try{
-				typeof(MainForm).GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance).Invoke(form, args);
+				return typeof(MainForm).GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance).Invoke(form, args);
 			}
 			catch(TargetInvocationException ee){
 				throw ee.InnerException;
@@ -92,6 +92,32 @@ namespace UyghurEditPP.Tests
 				}
 			});
 			Assert.AreEqual("second first old", File.ReadAllText(file));
+		}
+
+		// Re-review: a restored document over the limit would get no copy of its own, so its
+		// leftover would be offered again at every start. A copy is never longer than the limit
+		// (Recovery.Save refuses longer texts), so the longest possible one is checked here.
+		[TestMethod]
+		public void RestoringTheLongestPossibleCopy_GetsACopyOfItsOwn_SoTheLeftoverCanGo()
+		{
+			System.Text.StringBuilder sb = new System.Text.StringBuilder(Recovery.MaxChars);
+			string line = new string('a', 99) + "\n";
+			while(sb.Length < Recovery.MaxChars){
+				sb.Append(line);
+			}
+			string text = sb.ToString(0, Recovery.MaxChars);
+			string folder = Path.Combine(gFolder, "recovery");
+			Assert.IsTrue(new Recovery(folder, 1, new DateTime(5, DateTimeKind.Utc)).Save(Recovery.NewId(), null, "long", 65001, false, text));
+			RunOnSta(() => {
+				using(MainForm form = new MainForm()){
+					form.ShowInTaskbar = false;
+					form.Show();
+					Recovery.Leftover left = Recovery.FindLeftovers(folder, (pid, started) => pid != 1).Single();
+					bool restored = (bool)Call(form, "RestoreLeftover", left, new System.Collections.Generic.List<string>());
+					Assert.IsTrue(restored, "the leftover is deleted after this, not offered again");
+					Assert.AreEqual(Recovery.MaxChars, form.gEditor.Document.TextLength);
+				}
+			});
 		}
 
 		static void RunOnSta(Action action)
