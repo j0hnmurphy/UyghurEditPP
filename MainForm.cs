@@ -924,9 +924,72 @@ namespace UyghurEditPP
 			this.Location = new Point(rc.X,rc.Y);
 			this.Size = WindowSize.ToDevice(rc.Size, WindowSize.DpiAt(this.Location, DeviceDpi));
 			MenuYengiClick(null,null);
+			RestoreOpenFiles();
 		}
 
 		
+		// The files open when the program was last closed come back in the same order, with the
+		// same one selected; the first of them takes the empty untitled tab.
+		void RestoreOpenFiles()
+		{
+			// A second program (for example started by opening a file in Explorer) must not open
+			// the same files again: two windows would save over each other. It leaves the saved
+			// list alone, for the first window (the owner's decision; to let every window restore, drop this check).
+			gFirstWindow = InstanceLock.TryTake(InstanceLock.DefaultName);
+			if(gFirstWindow == null){
+				gKeepOpenFiles = true;
+				return;
+			}
+			string[] files = gConfig["ACHIQ"] as string[];
+			if(files == null){
+				return;
+			}
+			foreach(string f in files){
+				// A file that is gone, or cannot be read now, is skipped; the others still open.
+				try{
+					if(File.Exists(f)){
+						OpenaFile(f);
+					}
+				}
+				catch(Exception ee){
+					ErrorLog.Write(ee);
+				}
+			}
+			string active = gConfig["ACHIQ_TALLANGHAN"] as string;
+			foreach(TabPage pg in mainTab.TabPages){
+				if(SameFile(pg.Tag as string, active)){
+					mainTab.SelectedTab = pg;
+					break;
+				}
+			}
+		}
+
+		// Set in a window that is not the first of the session: it does not save its open files.
+		bool gKeepOpenFiles;
+		// Held by the first window until its settings are saved at closing.
+		InstanceLock gFirstWindow;
+
+		// Most files that come back at the next start (as many as the recent files list holds).
+		const int MaxRestoreFiles = 15;
+
+		// The saved files in the tabs, in tab order, and the selected one (null when it is a new document).
+		string[] OpenFilesNow(out string active)
+		{
+			List<string> files = new List<string>();
+			active = null;
+			foreach(TabPage pg in mainTab.TabPages){
+				string path = pg.Tag as string;
+				if(string.IsNullOrEmpty(path) || files.Count >= MaxRestoreFiles){
+					continue;
+				}
+				files.Add(path);
+				if(pg == mainTab.SelectedTab){
+					active = path;
+				}
+			}
+			return files.ToArray();
+		}
+
 		Font gMenuFont;
 
 		void CheckLangMenu(string lang){
@@ -1843,6 +1906,9 @@ namespace UyghurEditPP
 		void MainFormFormClosing(object sender, FormClosingEventArgs e)
 		{
 			DialogResult dr;
+			// Taken before the tabs are closed; kept only if the program really closes.
+			string activeFile;
+			string[] openFiles = OpenFilesNow(out activeFile);
 			while(mainTab.TabPages.Count!=0){
 				dr = CloseTab(0);
 				if(dr == DialogResult.Cancel){
@@ -1850,19 +1916,46 @@ namespace UyghurEditPP
 					break;
 				}
 			}
+			if(!e.Cancel && !gKeepOpenFiles){
+				gConfig["ACHIQ"] = openFiles;
+				if(activeFile != null){
+					gConfig["ACHIQ_TALLANGHAN"] = activeFile;
+				}
+				else{
+					gConfig.Remove("ACHIQ_TALLANGHAN");
+				}
+			}
+			// False when the settings must not be saved (the first window's list could not be read).
+			bool saveSettings = true;
+			if(gKeepOpenFiles){
+				// The list read at the start may be out of date: the first window may have saved since.
+				saveSettings = AppSettings.TakeOpenFilesFromDisk(AppPaths.DataFile(AppSettings.FileName), gConfig);
+			}
 			gConfig["IZLAR"]   = gIzlar.ToArray();
 			gConfig["ORUNLAR"] = gIzOffset;
 			try
 			{
 				gConfig["CHONGLUQI"] = new Rectangle(this.Location, WindowSize.ToLogical(this.Size, DeviceDpi));
 				System.Diagnostics.Debug.WriteLine(gConfig["CHONGLUQI"]);
-				AppSettings.Save(AppPaths.DataFile(AppSettings.FileName), gConfig);
+				if(saveSettings){
+					AppSettings.Save(AppPaths.DataFile(AppSettings.FileName), gConfig);
+				}
 			}
 			catch(Exception er)
 			{
 				// Losing the settings is better than not being able to close the program.
                 System.Diagnostics.Debug.WriteLine("Failed to serialize. Reason: " + er.Message);
 				ErrorLog.Write(er);
+			}
+			if(!e.Cancel && gFirstWindow != null){
+				// The settings are saved: a program started now may restore them, even before this one has ended.
+				try{
+					gFirstWindow.Dispose();
+				}
+				catch(Exception ee){
+					ErrorLog.Write(ee);   // closing must not fail over this; the mutex goes with the process
+				}
+				gFirstWindow = null;
 			}
 		}
 		void MenuAxirlashturClick(object sender, EventArgs e)

@@ -3,7 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Runtime.Serialization.Json;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace UyghurEditPP.Tests
@@ -51,6 +53,8 @@ namespace UyghurEditPP.Tests
 			h["CHONGLUQI"] = new Rectangle(10, 20, 1024, 768);
 			h["IZLAR"] = new[] { @"C:\Hojjetler\a.txt", @"D:\ئۇيغۇرچە\b.txt" };
 			h["ORUNLAR"] = new Dictionary<string, int> { { @"C:\Hojjetler\a.txt", 42 }, { @"D:\ئۇيغۇرچە\b.txt", 7 } };
+			h["ACHIQ"] = new[] { @"D:\ئۇيغۇرچە\b.txt", @"C:\Hojjetler\a.txt" };
+			h["ACHIQ_TALLANGHAN"] = @"C:\Hojjetler\a.txt";
 			return h;
 		}
 
@@ -200,6 +204,180 @@ namespace UyghurEditPP.Tests
 		{
 			Assert.AreEqual(0, AppSettings.Load(gJson, gCfg).Count);
 			Assert.AreEqual(0, gLogged.Count);
+		}
+
+		// The settings file as version 1.0.1 reads and writes it: AppSettings.Data, Bounds and
+		// FileOffset copied from commit 43f4c7e (no openFiles / activeFile / autosaveMinutes).
+		[DataContract]
+		class Data101
+		{
+			[DataMember(Name = "language", EmitDefaultValue = false, Order = 1)] public string Language;
+			[DataMember(Name = "keyboard", EmitDefaultValue = false, Order = 2)] public string Keyboard;
+			[DataMember(Name = "autoDetectScript", EmitDefaultValue = false, Order = 3)] public bool? AutoDetectScript;
+			[DataMember(Name = "spellingScript", EmitDefaultValue = false, Order = 4)] public string SpellingScript;
+			[DataMember(Name = "fontName", EmitDefaultValue = false, Order = 5)] public string FontName;
+			[DataMember(Name = "fontSize", EmitDefaultValue = false, Order = 6)] public float? FontSize;
+			[DataMember(Name = "fontStyle", EmitDefaultValue = false, Order = 7)] public int? FontStyle;
+			[DataMember(Name = "fontWeight", EmitDefaultValue = false, Order = 8)] public int? FontWeight;
+			[DataMember(Name = "window", EmitDefaultValue = false, Order = 9)] public Bounds101 Window;
+			[DataMember(Name = "recentFiles", EmitDefaultValue = false, Order = 10)] public string[] RecentFiles;
+			[DataMember(Name = "caretOffsets", EmitDefaultValue = false, Order = 11)] public List<FileOffset101> CaretOffsets;
+			[DataMember(Name = "theme", EmitDefaultValue = false, Order = 12)] public string Theme;
+		}
+
+		[DataContract]
+		class Bounds101
+		{
+			[DataMember(Name = "x", Order = 1)] public int X;
+			[DataMember(Name = "y", Order = 2)] public int Y;
+			[DataMember(Name = "width", Order = 3)] public int Width;
+			[DataMember(Name = "height", Order = 4)] public int Height;
+		}
+
+		[DataContract]
+		class FileOffset101
+		{
+			[DataMember(Name = "file", Order = 1)] public string File;
+			[DataMember(Name = "offset", Order = 2)] public int Offset;
+		}
+
+		[TestMethod]
+		public void Load_FileFromOlderVersion_HasNoOpenFiles()
+		{
+			using(FileStream fs = File.Create(gJson)){
+				new DataContractJsonSerializer(typeof(Data101)).WriteObject(fs, new Data101 { Language = "uey", Theme = "dark" });
+			}
+
+			Hashtable loaded = AppSettings.Load(gJson, gCfg);
+
+			Assert.AreEqual("uey", loaded["LANG"]);
+			Assert.IsFalse(loaded.ContainsKey("ACHIQ"));
+			Assert.IsFalse(loaded.ContainsKey("ACHIQ_TALLANGHAN"));
+			Assert.AreEqual(0, gLogged.Count);
+		}
+
+		[TestMethod]
+		public void OlderVersion_ReadsFileWithNewMembers_AndIgnoresThem()
+		{
+			AppSettings.Save(gJson, FullConfig());
+			StringAssert.Contains(File.ReadAllText(gJson), "\"openFiles\"");
+
+			Data101 old;
+			using(FileStream fs = File.OpenRead(gJson)){
+				old = (Data101)new DataContractJsonSerializer(typeof(Data101)).ReadObject(fs);
+			}
+
+			Assert.AreEqual("uey", old.Language);
+			Assert.AreEqual("UyghurLY", old.Keyboard);
+			Assert.AreEqual(false, old.AutoDetectScript);
+			Assert.AreEqual("ULY", old.SpellingScript);
+			Assert.AreEqual("UKIJ Tuz", old.FontName);
+			Assert.AreEqual(21.5f, old.FontSize);
+			Assert.AreEqual(1, old.FontStyle);
+			Assert.AreEqual(0, old.FontWeight);
+			Assert.AreEqual(1024, old.Window.Width);
+			Assert.AreEqual(2, old.RecentFiles.Length);
+			Assert.AreEqual(2, old.CaretOffsets.Count);
+			Assert.AreEqual(42, old.CaretOffsets[0].Offset);
+		}
+
+		[TestMethod]
+		public void Load_EmptyOpenFiles_StaysEmpty_AndEmptyNamesAreDropped()
+		{
+			File.WriteAllText(gJson, "{\"openFiles\":[],\"activeFile\":\"\"}");
+			Hashtable loaded = AppSettings.Load(gJson, gCfg);
+			Assert.AreEqual(0, ((string[])loaded["ACHIQ"]).Length);
+			Assert.IsFalse(loaded.ContainsKey("ACHIQ_TALLANGHAN"));
+
+			File.WriteAllText(gJson, "{\"openFiles\":[\"a.txt\",null,\"\"],\"activeFile\":\"a.txt\"}");
+			loaded = AppSettings.Load(gJson, gCfg);
+			CollectionAssert.AreEqual(new[] { "a.txt" }, (string[])loaded["ACHIQ"]);
+			Assert.AreEqual("a.txt", loaded["ACHIQ_TALLANGHAN"]);
+		}
+
+		// A second window closes after the first one saved its open files: it must save the
+		// first window's list, not the stale one it read at its start.
+		[TestMethod]
+		public void SecondWindowClosing_KeepsTheOpenFilesTheFirstWindowSaved()
+		{
+			Hashtable first = FullConfig();
+			first["ACHIQ"] = new[] { "new1.txt", "new2.txt" };
+			first["ACHIQ_TALLANGHAN"] = "new2.txt";
+			AppSettings.Save(gJson, first);
+
+			Hashtable second = FullConfig();
+			second["ACHIQ"] = new[] { "stale.txt" };
+			second["ACHIQ_TALLANGHAN"] = "stale.txt";
+			second["FONTSIZE"] = 30f;
+			AppSettings.TakeOpenFilesFromDisk(gJson, second);
+			AppSettings.Save(gJson, second);
+
+			Hashtable saved = AppSettings.Load(gJson, gCfg);
+			CollectionAssert.AreEqual(new[] { "new1.txt", "new2.txt" }, (string[])saved["ACHIQ"]);
+			Assert.AreEqual("new2.txt", saved["ACHIQ_TALLANGHAN"]);
+			Assert.AreEqual(30f, saved["FONTSIZE"]);   // its other settings are still saved
+		}
+
+		[TestMethod]
+		public void TakeOpenFilesFromDisk_NoListOnDisk_RemovesTheStaleOne()
+		{
+			Hashtable first = FullConfig();
+			first.Remove("ACHIQ");
+			first.Remove("ACHIQ_TALLANGHAN");
+			AppSettings.Save(gJson, first);
+			Hashtable second = FullConfig();
+			second["ACHIQ"] = new[] { "stale.txt" };
+			second["ACHIQ_TALLANGHAN"] = "stale.txt";
+			AppSettings.TakeOpenFilesFromDisk(gJson, second);
+			Assert.IsFalse(second.ContainsKey("ACHIQ_TALLANGHAN"));
+			Assert.IsTrue(second["ACHIQ"] == null || ((string[])second["ACHIQ"]).Length == 0);
+		}
+
+		[TestMethod]
+		public void TakeOpenFilesFromDisk_UnreadableFile_KeepsTheTableAndTheFile()
+		{
+			File.WriteAllText(gJson, "{ not json");
+			Hashtable second = FullConfig();
+			second["ACHIQ"] = new[] { "a.txt" };
+			// False: the window must not save its settings, so the list on disk stays.
+			Assert.IsFalse(AppSettings.TakeOpenFilesFromDisk(gJson, second));
+			CollectionAssert.AreEqual(new[] { "a.txt" }, (string[])second["ACHIQ"]);
+			Assert.IsTrue(File.Exists(gJson));   // not renamed to .bad-*: that is Load's job
+			Assert.AreEqual(1, gLogged.Count);
+		}
+
+		// Re-review: while the first window replaces the file, it cannot be read for a moment;
+		// the stale list was then kept and saved over the first window's.
+		[TestMethod]
+		public void TakeOpenFilesFromDisk_FileBriefly_Locked_TriesAgain()
+		{
+			Hashtable first = FullConfig();
+			first["ACHIQ"] = new[] { "new.txt" };
+			AppSettings.Save(gJson, first);
+			Hashtable second = FullConfig();
+			second["ACHIQ"] = new[] { "stale.txt" };
+			FileStream locked = new FileStream(gJson, FileMode.Open, FileAccess.Read, FileShare.None);
+			System.Threading.Timer release = new System.Threading.Timer(s => locked.Dispose(), null, 300, System.Threading.Timeout.Infinite);
+			try{
+				Assert.IsTrue(AppSettings.TakeOpenFilesFromDisk(gJson, second));
+			}
+			finally{
+				release.Dispose();
+				locked.Dispose();
+			}
+			CollectionAssert.AreEqual(new[] { "new.txt" }, (string[])second["ACHIQ"]);
+		}
+
+		[TestMethod]
+		public void TakeOpenFilesFromDisk_FileStaysLocked_SaysSo_AndKeepsTheTable()
+		{
+			AppSettings.Save(gJson, FullConfig());
+			Hashtable second = FullConfig();
+			second["ACHIQ"] = new[] { "stale.txt" };
+			using(new FileStream(gJson, FileMode.Open, FileAccess.Read, FileShare.None)){
+				Assert.IsFalse(AppSettings.TakeOpenFilesFromDisk(gJson, second));
+			}
+			CollectionAssert.AreEqual(new[] { "stale.txt" }, (string[])second["ACHIQ"]);
 		}
 
 		[TestMethod]

@@ -119,6 +119,9 @@ sözlerde xataliqlarni bayqisanglar, melum qilsanglar xush bolimen.
 
 ![](screenshot/usy.png)
 
+# Open files (English)
+The files that were open when you closed the program are opened again at the next start. Only the first window does this, and only its list is kept: if you close the first window and go on working in a second one, the second window's tabs are not opened again next time.
+
 # Ishlitilgen ochuq kodlar
 Avalonedit: https://github.com/icsharpcode/AvalonEdit
 

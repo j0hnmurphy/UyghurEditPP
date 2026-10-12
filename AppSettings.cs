@@ -43,6 +43,10 @@ namespace UyghurEditPP
 			[DataMember(Name = "caretOffsets", EmitDefaultValue = false, Order = 11)] public List<FileOffset> CaretOffsets;
 			// "light", "dark" or "system" (follow the Windows app mode); none = light.
 			[DataMember(Name = "theme", EmitDefaultValue = false, Order = 12)] public string Theme;
+			// The files open when the program was last closed, in tab order, and the selected one.
+			// Older versions ignore these members when they read the file (and drop them on saving).
+			[DataMember(Name = "openFiles", EmitDefaultValue = false, Order = 13)] public string[] OpenFiles;
+			[DataMember(Name = "activeFile", EmitDefaultValue = false, Order = 14)] public string ActiveFile;
 		}
 
 		[DataContract]
@@ -99,6 +103,58 @@ namespace UyghurEditPP
 		}
 
 		/// <summary>
+		/// Puts the open files list saved in jsonFile now (by the first window) into config, in
+		/// place of the one read at the start: a later window must not save its stale copy over
+		/// it. Returns false, leaving config as it is, when the file cannot be read (also after
+		/// trying again for a moment while another window is writing it): the settings must
+		/// then not be saved, so that the list on disk stays. Never throws.
+		/// </summary>
+		public static bool TakeOpenFilesFromDisk(string jsonFile, Hashtable config)
+		{
+			Hashtable onDisk = ReadForMerge(jsonFile);
+			if(onDisk == null){
+				return false;
+			}
+			foreach(string key in new[] { "ACHIQ", "ACHIQ_TALLANGHAN" }){
+				if(onDisk.ContainsKey(key)){
+					config[key] = onDisk[key];
+				}
+				else{
+					config.Remove(key);
+				}
+			}
+			return true;
+		}
+
+		// How long a file being replaced by another window is waited for.
+		const int ReadTries = 10;
+		const int ReadWaitMs = 100;
+
+		// The settings in jsonFile now; empty when there is no file yet; null when it cannot be read.
+		static Hashtable ReadForMerge(string jsonFile)
+		{
+			for(int i = 1; ; i++){
+				try{
+					using(FileStream fs = File.OpenRead(jsonFile)){
+						return ToHashtable((Data)new DataContractJsonSerializer(typeof(Data)).ReadObject(fs) ?? new Data());
+					}
+				}
+				catch(Exception ee){
+					if(ee is FileNotFoundException || ee is DirectoryNotFoundException){
+						return new Hashtable();   // nothing saved yet
+					}
+					// In use (being replaced): try again for a moment. Anything else fails at once.
+					if((ee is IOException || ee is UnauthorizedAccessException) && i < ReadTries){
+						System.Threading.Thread.Sleep(ReadWaitMs);
+						continue;
+					}
+					Log(ee);
+					return null;
+				}
+			}
+		}
+
+		/// <summary>
 		/// Writes the settings to jsonFile (through a temporary file).
 		/// </summary>
 		public static void Save(string jsonFile, Hashtable config)
@@ -127,6 +183,8 @@ namespace UyghurEditPP
 			if(d.Window != null) h["CHONGLUQI"] = new Rectangle(d.Window.X, d.Window.Y, d.Window.Width, d.Window.Height);
 			if(d.RecentFiles != null) h["IZLAR"] = Array.FindAll(d.RecentFiles, f => !string.IsNullOrEmpty(f));
 			if(d.Theme != null) h["TEMA"] = d.Theme;
+			if(d.OpenFiles != null) h["ACHIQ"] = Array.FindAll(d.OpenFiles, f => !string.IsNullOrEmpty(f));
+			if(!string.IsNullOrEmpty(d.ActiveFile)) h["ACHIQ_TALLANGHAN"] = d.ActiveFile;
 			if(d.CaretOffsets != null){
 				Dictionary<string,int> orunlar = new Dictionary<string, int>();
 				foreach(FileOffset fo in d.CaretOffsets){
@@ -154,6 +212,8 @@ namespace UyghurEditPP
 			}
 			d.RecentFiles = h["IZLAR"] as string[];
 			d.Theme = h["TEMA"] as string;
+			d.OpenFiles = h["ACHIQ"] as string[];
+			d.ActiveFile = h["ACHIQ_TALLANGHAN"] as string;
 			Dictionary<string,int> orunlar = h["ORUNLAR"] as Dictionary<string,int>;
 			if(orunlar != null){
 				d.CaretOffsets = new List<FileOffset>();
