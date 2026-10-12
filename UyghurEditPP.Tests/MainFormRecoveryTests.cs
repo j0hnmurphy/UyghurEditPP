@@ -120,6 +120,31 @@ namespace UyghurEditPP.Tests
 			});
 		}
 
+		// Real-machine check: two restored untitled documents and the empty first tab were all
+		// called Namsiz_1.txt; a new tab could then take the name of a restored one too.
+		[TestMethod]
+		public void RestoredAndNewUntitledTabs_AllGetDifferentNames()
+		{
+			string folder = Path.Combine(gFolder, "recovery");
+			new Recovery(folder, 1, new DateTime(5, DateTimeKind.Utc)).Save(Recovery.NewId(), null, "Namsiz_1.txt", 65001, false, "one");
+			new Recovery(folder, 2, new DateTime(6, DateTimeKind.Utc)).Save(Recovery.NewId(), null, "Namsiz_2.txt", 65001, false, "two");
+			new Recovery(folder, 3, new DateTime(7, DateTimeKind.Utc)).Save(Recovery.NewId(), null, "Namsiz_1.txt", 65001, false, "three");
+			RunOnSta(() => {
+				using(MainForm form = new MainForm()){
+					form.ShowInTaskbar = false;
+					form.Show();   // its first tab is Namsiz_1.txt
+					foreach(Recovery.Leftover left in Recovery.FindLeftovers(folder, (pid, started) => pid > 3)){
+						Assert.IsTrue((bool)Call(form, "RestoreLeftover", left, new System.Collections.Generic.List<string>()));
+					}
+					Call(form, "MenuYengiClick", null, EventArgs.Empty);
+					System.Windows.Forms.TabControl tabs = (System.Windows.Forms.TabControl)Field(form, "mainTab");
+					string[] names = tabs.TabPages.Cast<System.Windows.Forms.TabPage>().Select(p => p.Text.TrimStart('*')).ToArray();
+					Assert.AreEqual(5, names.Length);
+					Assert.AreEqual(names.Length, names.Distinct(StringComparer.OrdinalIgnoreCase).Count(), string.Join(", ", names));
+				}
+			});
+		}
+
 		static void RunOnSta(Action action)
 		{
 			Exception error = null;

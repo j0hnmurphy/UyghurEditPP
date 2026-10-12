@@ -1192,7 +1192,7 @@ namespace UyghurEditPP
 			}
 			if(!ownTab){
 				string name = !string.IsNullOrEmpty(path) ? gLang.GetText("Recovered") + " " + Path.GetFileName(path) : item.Title;
-				AddNew(string.IsNullOrEmpty(name) ? String.Format("Namsiz_{0}.txt", gFileNum++) : name);
+				AddNew(string.IsNullOrEmpty(name) || IsUntitledName(name) ? NewUntitledName() : FreeTabName(name));
 			}
 			TextEditor ed = gEditor;
 			ed.Text = text;
@@ -1516,8 +1516,43 @@ namespace UyghurEditPP
 		
 		void MenuYengiClick(object sender, EventArgs e)
 		{
-			AddNew(String.Format("Namsiz_{0}.txt",gFileNum));
-			gFileNum++;
+			AddNew(NewUntitledName());
+		}
+
+		bool TabNameTaken(string name)
+		{
+			foreach(TabPage pg in mainTab.TabPages){
+				if(string.Equals(pg.Text.TrimStart('*'), name, StringComparison.OrdinalIgnoreCase)){
+					return true;
+				}
+			}
+			return false;
+		}
+
+		static bool IsUntitledName(string name)
+		{
+			return Regex.IsMatch(name, @"^Namsiz_\d+\.txt$", RegexOptions.IgnoreCase);
+		}
+
+		// The next Namsiz_<n>.txt that no tab has (restored tabs keep such names too).
+		string NewUntitledName()
+		{
+			string name;
+			do{
+				name = String.Format("Namsiz_{0}.txt", gFileNum++);
+			}while(TabNameTaken(name));
+			return name;
+		}
+
+		// name, or "name (2).txt", "name (3).txt" ... when a tab already has it.
+		string FreeTabName(string name)
+		{
+			string stem = Path.GetFileNameWithoutExtension(name), ext = Path.GetExtension(name);
+			string free = name;
+			for(int i = 2; TabNameTaken(free); i++){
+				free = stem + " (" + i + ")" + ext;
+			}
+			return free;
 		}
 		
 		// Brings the toolbar, the tab title and the status bar up to date with the current
