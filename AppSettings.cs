@@ -43,6 +43,10 @@ namespace UyghurEditPP
 			[DataMember(Name = "caretOffsets", EmitDefaultValue = false, Order = 11)] public List<FileOffset> CaretOffsets;
 			// "light", "dark" or "system" (follow the Windows app mode); none = light.
 			[DataMember(Name = "theme", EmitDefaultValue = false, Order = 12)] public string Theme;
+			// The files open when the program was last closed, in tab order, and the selected one.
+			// Older versions ignore these members when they read the file (and drop them on saving).
+			[DataMember(Name = "openFiles", EmitDefaultValue = false, Order = 13)] public string[] OpenFiles;
+			[DataMember(Name = "activeFile", EmitDefaultValue = false, Order = 14)] public string ActiveFile;
 		}
 
 		[DataContract]
@@ -127,6 +131,8 @@ namespace UyghurEditPP
 			if(d.Window != null) h["CHONGLUQI"] = new Rectangle(d.Window.X, d.Window.Y, d.Window.Width, d.Window.Height);
 			if(d.RecentFiles != null) h["IZLAR"] = Array.FindAll(d.RecentFiles, f => !string.IsNullOrEmpty(f));
 			if(d.Theme != null) h["TEMA"] = d.Theme;
+			if(d.OpenFiles != null) h["ACHIQ"] = Array.FindAll(d.OpenFiles, f => !string.IsNullOrEmpty(f));
+			if(!string.IsNullOrEmpty(d.ActiveFile)) h["ACHIQ_TALLANGHAN"] = d.ActiveFile;
 			if(d.CaretOffsets != null){
 				Dictionary<string,int> orunlar = new Dictionary<string, int>();
 				foreach(FileOffset fo in d.CaretOffsets){
@@ -154,6 +160,8 @@ namespace UyghurEditPP
 			}
 			d.RecentFiles = h["IZLAR"] as string[];
 			d.Theme = h["TEMA"] as string;
+			d.OpenFiles = h["ACHIQ"] as string[];
+			d.ActiveFile = h["ACHIQ_TALLANGHAN"] as string;
 			Dictionary<string,int> orunlar = h["ORUNLAR"] as Dictionary<string,int>;
 			if(orunlar != null){
 				d.CaretOffsets = new List<FileOffset>();

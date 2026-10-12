@@ -924,9 +924,59 @@ namespace UyghurEditPP
 			this.Location = new Point(rc.X,rc.Y);
 			this.Size = WindowSize.ToDevice(rc.Size, WindowSize.DpiAt(this.Location, DeviceDpi));
 			MenuYengiClick(null,null);
+			RestoreOpenFiles();
 		}
 
 		
+		// The files open when the program was last closed come back in the same order, with the
+		// same one selected; the first of them takes the empty untitled tab.
+		void RestoreOpenFiles()
+		{
+			string[] files = gConfig["ACHIQ"] as string[];
+			if(files == null){
+				return;
+			}
+			foreach(string f in files){
+				// A file that is gone, or cannot be read now, is skipped; the others still open.
+				try{
+					if(File.Exists(f)){
+						OpenaFile(f);
+					}
+				}
+				catch(Exception ee){
+					ErrorLog.Write(ee);
+				}
+			}
+			string active = gConfig["ACHIQ_TALLANGHAN"] as string;
+			foreach(TabPage pg in mainTab.TabPages){
+				if(SameFile(pg.Tag as string, active)){
+					mainTab.SelectedTab = pg;
+					break;
+				}
+			}
+		}
+
+		// Most files that come back at the next start (as many as the recent files list holds).
+		const int MaxRestoreFiles = 15;
+
+		// The saved files in the tabs, in tab order, and the selected one (null when it is a new document).
+		string[] OpenFilesNow(out string active)
+		{
+			List<string> files = new List<string>();
+			active = null;
+			foreach(TabPage pg in mainTab.TabPages){
+				string path = pg.Tag as string;
+				if(string.IsNullOrEmpty(path) || files.Count >= MaxRestoreFiles){
+					continue;
+				}
+				files.Add(path);
+				if(pg == mainTab.SelectedTab){
+					active = path;
+				}
+			}
+			return files.ToArray();
+		}
+
 		Font gMenuFont;
 
 		void CheckLangMenu(string lang){
@@ -1843,11 +1893,23 @@ namespace UyghurEditPP
 		void MainFormFormClosing(object sender, FormClosingEventArgs e)
 		{
 			DialogResult dr;
+			// Taken before the tabs are closed; kept only if the program really closes.
+			string activeFile;
+			string[] openFiles = OpenFilesNow(out activeFile);
 			while(mainTab.TabPages.Count!=0){
 				dr = CloseTab(0);
 				if(dr == DialogResult.Cancel){
 					e.Cancel = true;
 					break;
+				}
+			}
+			if(!e.Cancel){
+				gConfig["ACHIQ"] = openFiles;
+				if(activeFile != null){
+					gConfig["ACHIQ_TALLANGHAN"] = activeFile;
+				}
+				else{
+					gConfig.Remove("ACHIQ_TALLANGHAN");
 				}
 			}
 			gConfig["IZLAR"]   = gIzlar.ToArray();

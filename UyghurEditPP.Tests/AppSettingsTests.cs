@@ -3,7 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Runtime.Serialization.Json;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace UyghurEditPP.Tests
@@ -51,6 +53,8 @@ namespace UyghurEditPP.Tests
 			h["CHONGLUQI"] = new Rectangle(10, 20, 1024, 768);
 			h["IZLAR"] = new[] { @"C:\Hojjetler\a.txt", @"D:\ئۇيغۇرچە\b.txt" };
 			h["ORUNLAR"] = new Dictionary<string, int> { { @"C:\Hojjetler\a.txt", 42 }, { @"D:\ئۇيغۇرچە\b.txt", 7 } };
+			h["ACHIQ"] = new[] { @"D:\ئۇيغۇرچە\b.txt", @"C:\Hojjetler\a.txt" };
+			h["ACHIQ_TALLANGHAN"] = @"C:\Hojjetler\a.txt";
 			return h;
 		}
 
@@ -200,6 +204,59 @@ namespace UyghurEditPP.Tests
 		{
 			Assert.AreEqual(0, AppSettings.Load(gJson, gCfg).Count);
 			Assert.AreEqual(0, gLogged.Count);
+		}
+
+		// The settings file as version 1.0.1 reads and writes it (no openFiles / activeFile).
+		[DataContract]
+		class Data101
+		{
+			[DataMember(Name = "language", EmitDefaultValue = false, Order = 1)] public string Language;
+			[DataMember(Name = "recentFiles", EmitDefaultValue = false, Order = 10)] public string[] RecentFiles;
+			[DataMember(Name = "theme", EmitDefaultValue = false, Order = 12)] public string Theme;
+		}
+
+		[TestMethod]
+		public void Load_FileFromOlderVersion_HasNoOpenFiles()
+		{
+			using(FileStream fs = File.Create(gJson)){
+				new DataContractJsonSerializer(typeof(Data101)).WriteObject(fs, new Data101 { Language = "uey", Theme = "dark" });
+			}
+
+			Hashtable loaded = AppSettings.Load(gJson, gCfg);
+
+			Assert.AreEqual("uey", loaded["LANG"]);
+			Assert.IsFalse(loaded.ContainsKey("ACHIQ"));
+			Assert.IsFalse(loaded.ContainsKey("ACHIQ_TALLANGHAN"));
+			Assert.AreEqual(0, gLogged.Count);
+		}
+
+		[TestMethod]
+		public void OlderVersion_ReadsFileWithNewMembers_AndIgnoresThem()
+		{
+			AppSettings.Save(gJson, FullConfig());
+			StringAssert.Contains(File.ReadAllText(gJson), "\"openFiles\"");
+
+			Data101 old;
+			using(FileStream fs = File.OpenRead(gJson)){
+				old = (Data101)new DataContractJsonSerializer(typeof(Data101)).ReadObject(fs);
+			}
+
+			Assert.AreEqual("uey", old.Language);
+			Assert.AreEqual(2, old.RecentFiles.Length);
+		}
+
+		[TestMethod]
+		public void Load_EmptyOpenFiles_StaysEmpty_AndEmptyNamesAreDropped()
+		{
+			File.WriteAllText(gJson, "{\"openFiles\":[],\"activeFile\":\"\"}");
+			Hashtable loaded = AppSettings.Load(gJson, gCfg);
+			Assert.AreEqual(0, ((string[])loaded["ACHIQ"]).Length);
+			Assert.IsFalse(loaded.ContainsKey("ACHIQ_TALLANGHAN"));
+
+			File.WriteAllText(gJson, "{\"openFiles\":[\"a.txt\",null,\"\"],\"activeFile\":\"a.txt\"}");
+			loaded = AppSettings.Load(gJson, gCfg);
+			CollectionAssert.AreEqual(new[] { "a.txt" }, (string[])loaded["ACHIQ"]);
+			Assert.AreEqual("a.txt", loaded["ACHIQ_TALLANGHAN"]);
 		}
 
 		[TestMethod]
