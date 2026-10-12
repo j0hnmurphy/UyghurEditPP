@@ -573,5 +573,15 @@
     "uly": "Qayta sina",
     "jpn": "再試行(&R)",
     "eng": "&Retry"
+  },
+  "The program did not close normally last time. Restore the unsaved documents?": {
+    "uly": "Program aldinqi qétim normal taqalmidi. Saqlanmighan höjjetlerni eslige keltüremsiz?",
+    "jpn": "前回は正常に終了しませんでした。保存していなかった文書を復元しますか?",
+    "eng": "The program did not close normally last time. Restore the unsaved documents?"
+  },
+  "Recovered": {
+    "uly": "Eslige keltürüldi",
+    "jpn": "復元",
+    "eng": "Recovered"
   }
 }

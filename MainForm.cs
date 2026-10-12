@@ -925,6 +925,7 @@ namespace UyghurEditPP
 			this.Size = WindowSize.ToDevice(rc.Size, WindowSize.DpiAt(this.Location, DeviceDpi));
 			MenuYengiClick(null,null);
 			RestoreOpenFiles();
+			StartRecovery();
 		}
 
 		
@@ -989,6 +990,205 @@ namespace UyghurEditPP
 			}
 			return files.ToArray();
 		}
+
+		#region Recovery of unsaved documents
+		// Copies of the modified documents are kept while the program runs (see Recovery), and
+		// are offered again at the next start if the program did not exit normally.
+		Recovery gRecovery;   // null when it cannot be used, or once the program is closing
+		Timer    gAutosaveTimer;
+
+		// The copy kept for an editor, and the text version it was made from.
+		sealed class RecoveryTab
+		{
+			public string Id;
+			public ITextSourceVersion Version;
+		}
+		readonly Dictionary<TextEditor, RecoveryTab> gRecoveryTabs = new Dictionary<TextEditor, RecoveryTab>();
+
+		static TextEditor EditorOf(TabPage pg)
+		{
+			return (TextEditor)((ElementHost)pg.Controls[0]).Child;
+		}
+
+		void StartRecovery()
+		{
+			try{
+				System.Diagnostics.Process me = System.Diagnostics.Process.GetCurrentProcess();
+				gRecovery = new Recovery(Recovery.DefaultFolder, me.Id, me.StartTime.ToUniversalTime());
+				Recovery.DeleteOld(Recovery.DefaultFolder, DateTime.Now.AddDays(-Recovery.KeepDays), Recovery.IsRunning);
+			}
+			catch(Exception ee){
+				ErrorLog.Write(ee);
+				return;
+			}
+			int minutes = Recovery.Minutes(gConfig["AVTOSAQLASH"]);
+			if(minutes > 0){
+				gAutosaveTimer = new Timer();
+				gAutosaveTimer.Interval = minutes * 60 * 1000;
+				gAutosaveTimer.Tick += (s, a) => SaveRecoveryCopies();
+				gAutosaveTimer.Start();
+			}
+			// After the window is shown, and after the files given on the command line are opened.
+			BeginInvoke(new Action(OfferRecovery));
+		}
+
+		void SaveRecoveryCopies()
+		{
+			foreach(TabPage pg in mainTab.TabPages){
+				SaveRecoveryCopy(pg);
+			}
+		}
+
+		// Writes the copy of the tab if its text changed since the last one, and removes the
+		// copy of a tab that is not modified. Returns false if the copy could not be kept.
+		// Never throws: a copy that fails must not disturb the editing.
+		bool SaveRecoveryCopy(TabPage pg)
+		{
+			if(gRecovery == null){
+				return false;
+			}
+			try{
+				TextEditor ed = EditorOf(pg);
+				RecoveryTab state;
+				gRecoveryTabs.TryGetValue(ed, out state);
+				if(!ed.IsModified){
+					ForgetRecovery(ed);
+					return true;
+				}
+				ITextSource snapshot = ed.Document.CreateSnapshot();
+				if(state != null && snapshot.Version.BelongsToSameDocumentAs(state.Version) && snapshot.Version.CompareAge(state.Version) == 0){
+					return true;
+				}
+				string path = pg.Tag as string;
+				if(string.IsNullOrEmpty(path) && snapshot.TextLength == 0){
+					ForgetRecovery(ed);   // nothing worth keeping in a new document
+					return true;
+				}
+				string id = state != null ? state.Id : Recovery.NewId();
+				string title = pg.Text.StartsWith("*") ? pg.Text.Substring(1) : pg.Text;
+				bool bom = ed.Encoding != null && ed.Encoding.GetPreamble().Length > 0;
+				if(!gRecovery.Save(id, string.IsNullOrEmpty(path) ? null : path, title, ed.CodePage, bom, snapshot.Text)){
+					return false;
+				}
+				gRecoveryTabs[ed] = new RecoveryTab{Id = id, Version = snapshot.Version};
+				return true;
+			}
+			catch(Exception ee){
+				ErrorLog.Write(ee);
+				return false;
+			}
+		}
+
+		// The editor was saved, or its tab closed: its copy is not needed any more.
+		void ForgetRecovery(TextEditor ed)
+		{
+			RecoveryTab state;
+			if(gRecovery == null || !gRecoveryTabs.TryGetValue(ed, out state)){
+				return;
+			}
+			gRecoveryTabs.Remove(ed);
+			try{
+				gRecovery.Remove(state.Id);
+			}
+			catch(Exception ee){
+				ErrorLog.Write(ee);
+			}
+		}
+
+		// The program is closing: nothing is left to recover.
+		void EndRecovery()
+		{
+			if(gAutosaveTimer != null){
+				gAutosaveTimer.Stop();
+			}
+			if(gRecovery != null){
+				gRecovery.Clear();
+				gRecovery = null;
+			}
+		}
+
+		void OfferRecovery()
+		{
+			if(gRecovery == null || IsDisposed){
+				return;
+			}
+			List<Recovery.Leftover> found;
+			try{
+				found = Recovery.FindLeftovers(Recovery.DefaultFolder, Recovery.IsRunning);
+			}
+			catch(Exception ee){
+				ErrorLog.Write(ee);
+				return;
+			}
+			if(found.Count == 0){
+				return;
+			}
+			DialogResult dr = CenteredMessageBox.Show(this, gLang.GetText("The program did not close normally last time. Restore the unsaved documents?"), "UyghurEdit++ v" + GetVersion(), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+			foreach(Recovery.Leftover left in found){
+				// A leftover is deleted only after an explicit "No", or once all its documents
+				// are back in tabs (and have copies of their own); otherwise it stays for the next start.
+				if(dr == DialogResult.No || (dr == DialogResult.Yes && RestoreLeftover(left))){
+					Recovery.Discard(left);
+				}
+			}
+		}
+
+		bool RestoreLeftover(Recovery.Leftover left)
+		{
+			bool all = true;
+			foreach(Recovery.LeftoverCopy item in left.Items){
+				try{
+					all &= RestoreCopy(item);
+				}
+				catch(Exception ee){
+					ErrorLog.Write(ee);
+					all = false;
+				}
+			}
+			return all;
+		}
+
+		bool RestoreCopy(Recovery.LeftoverCopy item)
+		{
+			string text = item.ReadText();
+			string path = item.Path;
+			// The copy goes back into the file's own tab only if the file has not changed since
+			// the copy was made; otherwise saving would overwrite the newer file.
+			bool ownTab = !string.IsNullOrEmpty(path) && File.Exists(path) && !IsImageFile(path)
+				&& File.GetLastWriteTimeUtc(path) <= item.SavedUtc.AddSeconds(2);
+			if(ownTab){
+				OpenaFile(path);
+				if(gEditor.IsModified){
+					ownTab = false;   // that tab already has edits of its own
+				}
+			}
+			if(!ownTab){
+				string name = !string.IsNullOrEmpty(path) ? gLang.GetText("Recovered") + " " + Path.GetFileName(path) : item.Title;
+				AddNew(string.IsNullOrEmpty(name) ? String.Format("Namsiz_{0}.txt", gFileNum++) : name);
+			}
+			TextEditor ed = gEditor;
+			ed.Text = text;
+			ed.IsModified = true;
+			int codePage = item.CodePage;
+			if(codePage > 0 && codePage != ed.CodePage){
+				try{
+					// UTF-8 and UTF-16 keep the byte order mark the file had.
+					ed.Encoding = codePage == 65001 ? new UTF8Encoding(item.Bom)
+						: (codePage == 1200 || codePage == 1201) ? new UnicodeEncoding(codePage == 1201, item.Bom)
+						: Encoding.GetEncoding(codePage);
+					ed.CodePage = codePage;
+				}
+				catch(ArgumentException ee){
+					ErrorLog.Write(ee);   // this system does not have that code page: it saves as before
+				}
+			}
+			else if(codePage < 0){
+				ed.CodePage = codePage;   // an old Uyghur code: shown as before, saved as UTF-8
+			}
+			UpdateToolbar();
+			return SaveRecoveryCopy(mainTab.SelectedTab);
+		}
+		#endregion
 
 		Font gMenuFont;
 
@@ -1484,6 +1684,10 @@ namespace UyghurEditPP
 		}
 		
 		void TextOzgerdi(object sender, EventArgs e){
+			TextEditor changed = sender as TextEditor;
+			if(changed != null && !changed.IsModified && gRecoveryTabs.Count > 0){
+				ForgetRecovery(changed);   // saved, or undone back to the saved text
+			}
 			UpdateToolbar();
 		}
 		void UndoStackOzgerdi(object sender, System.ComponentModel.PropertyChangedEventArgs e){
@@ -1896,6 +2100,7 @@ namespace UyghurEditPP
 			}
 			gIzOffset[filenm] = curEdit.CaretOffset;
 			mainTab.TabPages.RemoveAt(tabIndex);
+			ForgetRecovery(curEdit);
 			// The descriptor holds the editor; release it so the closed tab can be collected.
 			System.ComponentModel.DependencyPropertyDescriptor.FromProperty(TextEditor.IsModifiedProperty, typeof(TextEditor)).RemoveValueChanged(curEdit, TextOzgerdi);
 			curEdit.Clear();
@@ -1909,12 +2114,26 @@ namespace UyghurEditPP
 			// Taken before the tabs are closed; kept only if the program really closes.
 			string activeFile;
 			string[] openFiles = OpenFilesNow(out activeFile);
-			while(mainTab.TabPages.Count!=0){
-				dr = CloseTab(0);
-				if(dr == DialogResult.Cancel){
-					e.Cancel = true;
-					break;
+			if(gAutosaveTimer != null){
+				gAutosaveTimer.Stop();   // the copies are not written while the tabs are being closed
+			}
+			try{
+				while(mainTab.TabPages.Count!=0){
+					dr = CloseTab(0);
+					if(dr == DialogResult.Cancel){
+						e.Cancel = true;
+						break;
+					}
 				}
+			}
+			finally{
+				// A close that did not complete (cancelled, or an error) goes on making copies.
+				if(gAutosaveTimer != null && (e.Cancel || mainTab.TabPages.Count != 0)){
+					gAutosaveTimer.Start();
+				}
+			}
+			if(!e.Cancel){
+				EndRecovery();
 			}
 			if(!e.Cancel && !gKeepOpenFiles){
 				gConfig["ACHIQ"] = openFiles;
