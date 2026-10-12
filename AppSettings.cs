@@ -105,40 +105,13 @@ namespace UyghurEditPP
 		}
 
 		/// <summary>
-		/// Puts the open files list saved in jsonFile now (by the first window) into config, in
-		/// place of the one read at the start: a later window must not save its stale copy over
-		/// it. Returns false, leaving config as it is, when the file cannot be read (also after
-		/// trying again for a moment while another window is writing it): the settings must
-		/// then not be saved, so that the list on disk stays. Never throws.
-		/// </summary>
-		public static bool TakeOpenFilesFromDisk(string jsonFile, Hashtable config)
-		{
-			Hashtable onDisk = ReadForMerge(jsonFile);
-			if(onDisk == null){
-				return false;
-			}
-			TakeOpenFiles(onDisk, config);
-			return true;
-		}
-
-		static void TakeOpenFiles(Hashtable onDisk, Hashtable config)
-		{
-			foreach(string key in new[] { "ACHIQ", "ACHIQ_TALLANGHAN" }){
-				if(onDisk.ContainsKey(key)){
-					config[key] = onDisk[key];
-				}
-				else{
-					config.Remove(key);
-				}
-			}
-		}
-
-		/// <summary>
-		/// For a window that is not the first one, before it saves its settings: as
-		/// TakeOpenFilesFromDisk, and the recent files and caret positions are merged with
-		/// those saved in jsonFile now. The files this window used (usedFiles) come first, in
-		/// its order, with its caret positions; the others, and their positions, are taken from
-		/// the file. At most maxRecent recent files. Returns false as TakeOpenFilesFromDisk does.
+		/// Before a window saves its settings: the open files list saved in jsonFile now is put
+		/// into config, in place of the one read at the start (the first window then puts its own
+		/// back), and the recent files and caret positions are merged with those in jsonFile. The
+		/// files this window used (usedFiles) come first, in its order, with its caret positions;
+		/// the others, and their positions, are taken from the file. At most maxRecent recent
+		/// files. Returns false, leaving config as it is, when the file cannot be read (also after
+		/// trying again for a moment while another window is writing it). Never throws.
 		/// (The other settings stay this window's: the last window closed decides them.)
 		/// </summary>
 		public static bool TakeListsFromDisk(string jsonFile, Hashtable config, ICollection<string> usedFiles, int maxRecent)
@@ -147,7 +120,14 @@ namespace UyghurEditPP
 			if(onDisk == null){
 				return false;
 			}
-			TakeOpenFiles(onDisk, config);
+			foreach(string key in new[] { "ACHIQ", "ACHIQ_TALLANGHAN" }){
+				if(onDisk.ContainsKey(key)){
+					config[key] = onDisk[key];
+				}
+				else{
+					config.Remove(key);
+				}
+			}
 			HashSet<string> used = new HashSet<string>(usedFiles, StringComparer.OrdinalIgnoreCase);
 			List<string> recent = new List<string>();
 			foreach(string f in config["IZLAR"] as string[] ?? new string[0]){

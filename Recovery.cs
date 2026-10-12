@@ -78,7 +78,6 @@ namespace UyghurEditPP
 		public sealed class Leftover
 		{
 			internal string IndexFile;
-			internal int Pid;
 			internal string Folder;
 			internal List<Copy> Documents = new List<Copy>();
 
@@ -219,15 +218,11 @@ namespace UyghurEditPP
 
 		/// <summary>
 		/// Writes (or replaces) the copy <paramref name="id"/>. fileTime and fileLength are those
-		/// of the file as loaded or saved last (0 when not known). Returns false, writing nothing,
-		/// when the text is too long. Throws when a file cannot be written.
+		/// of the file as loaded or saved last (0 when not known). The caller keeps the text within
+		/// MaxChars. Throws when a file cannot be written.
 		/// </summary>
-		public bool Save(string id, string path, string title, int codePage, bool bom, string text, long fileTime = 0, long fileLength = 0)
+		public void Save(string id, string path, string title, int codePage, bool bom, string text, long fileTime = 0, long fileLength = 0)
 		{
-			if(text.Length > MaxChars){
-				ReportTooLong(title, text.Length);
-				return false;
-			}
 			Directory.CreateDirectory(gFolder);
 			// The copy first, then the index that names it: an index never names a missing copy.
 			SafeFile.Write(TextFile(gFolder, id), stream => {
@@ -247,7 +242,6 @@ namespace UyghurEditPP
 			doc.FileLength = fileLength;
 			doc.Saved = DateTime.UtcNow.Ticks;
 			WriteIndex();
-			return true;
 		}
 
 		/// <summary>Forgets the copy <paramref name="id"/> and deletes it.</summary>
@@ -385,7 +379,7 @@ namespace UyghurEditPP
 					if(index == null || index.Documents == null || OwnerRunning(file, index, isRunning)){
 						continue;
 					}
-					Leftover left = new Leftover{IndexFile = file, Pid = index.Pid, Folder = folder};
+					Leftover left = new Leftover{IndexFile = file, Folder = folder};
 					foreach(Copy d in index.Documents){
 						if(d != null && d.Id != null && gIdPattern.IsMatch(d.Id) && File.Exists(TextFile(folder, d.Id))){
 							left.Documents.Add(d);

@@ -986,9 +986,6 @@ namespace UyghurEditPP
 		// Held by the first window until its settings are saved at closing.
 		InstanceLock gFirstWindow;
 
-		// Most files that come back at the next start (as many as the recent files list holds).
-		const int MaxRestoreFiles = 15;
-
 		// The saved files in the tabs, in tab order, and the selected one (null when it is a new document).
 		string[] OpenFilesNow(out string active)
 		{
@@ -996,7 +993,7 @@ namespace UyghurEditPP
 			active = null;
 			foreach(TabPage pg in mainTab.TabPages){
 				string path = pg.Tag as string;
-				if(string.IsNullOrEmpty(path) || files.Count >= MaxRestoreFiles){
+				if(string.IsNullOrEmpty(path) || files.Count >= MaxRecentFiles){   // as many as the recent files list holds
 					continue;
 				}
 				files.Add(path);
@@ -1106,10 +1103,7 @@ namespace UyghurEditPP
 					return true;
 				}
 				string id = state != null ? state.Id : Recovery.NewId();
-				if(!gRecovery.Save(id, path, title, ed.CodePage, bom, snapshot.Text, fileTime, fileLength)){
-					gRecoveryBroken = true;
-					return false;
-				}
+				gRecovery.Save(id, path, title, ed.CodePage, bom, snapshot.Text, fileTime, fileLength);
 				gRecoveryTabs[ed] = new Recovery.Written{Id = id, Version = snapshot.Version, CodePage = ed.CodePage, Bom = bom, FileTime = fileTime, FileLength = fileLength};
 				gRecoveryBroken = false;
 				return true;

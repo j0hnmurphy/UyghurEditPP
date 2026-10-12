@@ -310,7 +310,7 @@ namespace UyghurEditPP.Tests
 			second["ACHIQ"] = new[] { "stale.txt" };
 			second["ACHIQ_TALLANGHAN"] = "stale.txt";
 			second["FONTSIZE"] = 30f;
-			AppSettings.TakeOpenFilesFromDisk(gJson, second);
+			AppSettings.TakeListsFromDisk(gJson, second, new string[0], 15);
 			AppSettings.Save(gJson, second);
 
 			Hashtable saved = AppSettings.Load(gJson, gCfg);
@@ -356,7 +356,7 @@ namespace UyghurEditPP.Tests
 		}
 
 		[TestMethod]
-		public void TakeOpenFilesFromDisk_NoListOnDisk_RemovesTheStaleOne()
+		public void TakeListsFromDisk_NoListOnDisk_RemovesTheStaleOne()
 		{
 			Hashtable first = FullConfig();
 			first.Remove("ACHIQ");
@@ -365,19 +365,19 @@ namespace UyghurEditPP.Tests
 			Hashtable second = FullConfig();
 			second["ACHIQ"] = new[] { "stale.txt" };
 			second["ACHIQ_TALLANGHAN"] = "stale.txt";
-			AppSettings.TakeOpenFilesFromDisk(gJson, second);
+			AppSettings.TakeListsFromDisk(gJson, second, new string[0], 15);
 			Assert.IsFalse(second.ContainsKey("ACHIQ_TALLANGHAN"));
 			Assert.IsTrue(second["ACHIQ"] == null || ((string[])second["ACHIQ"]).Length == 0);
 		}
 
 		[TestMethod]
-		public void TakeOpenFilesFromDisk_UnreadableFile_KeepsTheTableAndTheFile()
+		public void TakeListsFromDisk_UnreadableFile_KeepsTheTableAndTheFile()
 		{
 			File.WriteAllText(gJson, "{ not json");
 			Hashtable second = FullConfig();
 			second["ACHIQ"] = new[] { "a.txt" };
 			// False: the window must not save its settings, so the list on disk stays.
-			Assert.IsFalse(AppSettings.TakeOpenFilesFromDisk(gJson, second));
+			Assert.IsFalse(AppSettings.TakeListsFromDisk(gJson, second, new string[0], 15));
 			CollectionAssert.AreEqual(new[] { "a.txt" }, (string[])second["ACHIQ"]);
 			Assert.IsTrue(File.Exists(gJson));   // not renamed to .bad-*: that is Load's job
 			Assert.AreEqual(1, gLogged.Count);
@@ -386,7 +386,7 @@ namespace UyghurEditPP.Tests
 		// Re-review: while the first window replaces the file, it cannot be read for a moment;
 		// the stale list was then kept and saved over the first window's.
 		[TestMethod]
-		public void TakeOpenFilesFromDisk_FileBriefly_Locked_TriesAgain()
+		public void TakeListsFromDisk_FileBriefly_Locked_TriesAgain()
 		{
 			Hashtable first = FullConfig();
 			first["ACHIQ"] = new[] { "new.txt" };
@@ -396,7 +396,7 @@ namespace UyghurEditPP.Tests
 			FileStream locked = new FileStream(gJson, FileMode.Open, FileAccess.Read, FileShare.None);
 			System.Threading.Timer release = new System.Threading.Timer(s => locked.Dispose(), null, 300, System.Threading.Timeout.Infinite);
 			try{
-				Assert.IsTrue(AppSettings.TakeOpenFilesFromDisk(gJson, second));
+				Assert.IsTrue(AppSettings.TakeListsFromDisk(gJson, second, new string[0], 15));
 			}
 			finally{
 				release.Dispose();
@@ -406,13 +406,13 @@ namespace UyghurEditPP.Tests
 		}
 
 		[TestMethod]
-		public void TakeOpenFilesFromDisk_FileStaysLocked_SaysSo_AndKeepsTheTable()
+		public void TakeListsFromDisk_FileStaysLocked_SaysSo_AndKeepsTheTable()
 		{
 			AppSettings.Save(gJson, FullConfig());
 			Hashtable second = FullConfig();
 			second["ACHIQ"] = new[] { "stale.txt" };
 			using(new FileStream(gJson, FileMode.Open, FileAccess.Read, FileShare.None)){
-				Assert.IsFalse(AppSettings.TakeOpenFilesFromDisk(gJson, second));
+				Assert.IsFalse(AppSettings.TakeListsFromDisk(gJson, second, new string[0], 15));
 			}
 			CollectionAssert.AreEqual(new[] { "stale.txt" }, (string[])second["ACHIQ"]);
 		}
