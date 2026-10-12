@@ -343,6 +343,70 @@ namespace UyghurEditPP.Tests
 			Assert.AreEqual(30, offsets[@"C:\old.txt"]);       // not used here: the stale 99 is not saved
 		}
 
+		// Review of #24 (L2): caret positions of files no longer in the recent list were kept forever.
+		[TestMethod]
+		public void MergedCaretPositions_OnlyOfTheRecentFiles()
+		{
+			Hashtable first = FullConfig();
+			first["IZLAR"] = new[] { "a" };
+			first["ORUNLAR"] = new Dictionary<string, int>{ { "a", 1 }, { "gone", 2 } };
+			AppSettings.Save(gJson, first);
+			Hashtable second = FullConfig();
+			second["IZLAR"] = new[] { "x" };
+			second["ORUNLAR"] = new Dictionary<string, int>{ { "x", 3 }, { "old", 4 } };
+			Assert.IsTrue(AppSettings.TakeListsFromDisk(gJson, second, new[] { "x", "old" }, 15));
+			CollectionAssert.AreEquivalent(new[] { "x", "a" }, new List<string>(((Dictionary<string, int>)second["ORUNLAR"]).Keys));
+		}
+
+		// Review of #24 (L4): two windows closing at once could each read, merge and write the
+		// settings in turn, the later write losing the other window's lists.
+		[TestMethod, Timeout(30000)]
+		public void SaveLock_SecondWindowWaits_UntilTheFirstHasWritten()
+		{
+			string name = @"Local\UyghurEditPP.Tests." + Guid.NewGuid().ToString("N");
+			List<string> order = new List<string>();
+			using(System.Threading.ManualResetEventSlim inside = new System.Threading.ManualResetEventSlim(),
+			      release = new System.Threading.ManualResetEventSlim()){
+				System.Threading.Thread first = new System.Threading.Thread(() => AppSettings.WithSaveLock(() => {
+					inside.Set();
+					release.Wait();
+					lock(order) order.Add("first");
+				}, name, 10000));
+				first.Start();
+				inside.Wait();
+				System.Threading.Thread second = new System.Threading.Thread(() => AppSettings.WithSaveLock(() => {
+					lock(order) order.Add("second");
+				}, name, 10000));
+				second.Start();
+				Assert.IsFalse(second.Join(300), "the second window must wait");
+				release.Set();
+				first.Join();
+				second.Join();
+			}
+			CollectionAssert.AreEqual(new[] { "first", "second" }, order);
+		}
+
+		// A window that does not let go (hung) must not stop the other from closing.
+		[TestMethod, Timeout(30000)]
+		public void SaveLock_NotFreed_GoesOnAfterTheTimeout()
+		{
+			string name = @"Local\UyghurEditPP.Tests." + Guid.NewGuid().ToString("N");
+			using(System.Threading.ManualResetEventSlim inside = new System.Threading.ManualResetEventSlim(),
+			      release = new System.Threading.ManualResetEventSlim()){
+				System.Threading.Thread hung = new System.Threading.Thread(() => AppSettings.WithSaveLock(() => {
+					inside.Set();
+					release.Wait();
+				}, name, 10000));
+				hung.Start();
+				inside.Wait();
+				bool ran = false;
+				AppSettings.WithSaveLock(() => ran = true, name, 100);
+				Assert.IsTrue(ran);
+				release.Set();
+				hung.Join();
+			}
+		}
+
 		[TestMethod]
 		public void MergedRecentFiles_AreCut_AtTheLimit()
 		{

@@ -2238,34 +2238,37 @@ namespace UyghurEditPP
 			}
 			gConfig["IZLAR"]   = gIzlar.ToArray();
 			gConfig["ORUNLAR"] = gIzOffset;
-			// The lists read at the start may be out of date: another window may have saved since.
-			// Its open files are kept, and its recent files and caret positions merged with this window's.
-			bool merged = AppSettings.TakeListsFromDisk(AppPaths.DataFile(AppSettings.FileName), gConfig, gUsedFiles, MaxRecentFiles);
-			if(!e.Cancel && !gKeepOpenFiles){
-				gConfig["ACHIQ"] = openFiles;   // the first window's open files are its own
-				if(activeFile != null){
-					gConfig["ACHIQ_TALLANGHAN"] = activeFile;
+			// One window at a time reads, merges and writes the settings (see WithSaveLock).
+			AppSettings.WithSaveLock(() => {
+				// The lists read at the start may be out of date: another window may have saved since.
+				// Its open files are kept, and its recent files and caret positions merged with this window's.
+				bool merged = AppSettings.TakeListsFromDisk(AppPaths.DataFile(AppSettings.FileName), gConfig, gUsedFiles, MaxRecentFiles);
+				if(!e.Cancel && !gKeepOpenFiles){
+					gConfig["ACHIQ"] = openFiles;   // the first window's open files are its own
+					if(activeFile != null){
+						gConfig["ACHIQ_TALLANGHAN"] = activeFile;
+					}
+					else{
+						gConfig.Remove("ACHIQ_TALLANGHAN");
+					}
 				}
-				else{
-					gConfig.Remove("ACHIQ_TALLANGHAN");
+				// A later window that could not read the first window's lists must not save over them.
+				bool saveSettings = merged || !gKeepOpenFiles;
+				try
+				{
+					gConfig["CHONGLUQI"] = new Rectangle(this.Location, WindowSize.ToLogical(this.Size, DeviceDpi));
+					System.Diagnostics.Debug.WriteLine(gConfig["CHONGLUQI"]);
+					if(saveSettings){
+						AppSettings.Save(AppPaths.DataFile(AppSettings.FileName), gConfig);
+					}
 				}
-			}
-			// A later window that could not read the first window's lists must not save over them.
-			bool saveSettings = merged || !gKeepOpenFiles;
-			try
-			{
-				gConfig["CHONGLUQI"] = new Rectangle(this.Location, WindowSize.ToLogical(this.Size, DeviceDpi));
-				System.Diagnostics.Debug.WriteLine(gConfig["CHONGLUQI"]);
-				if(saveSettings){
-					AppSettings.Save(AppPaths.DataFile(AppSettings.FileName), gConfig);
+				catch(Exception er)
+				{
+					// Losing the settings is better than not being able to close the program.
+	                System.Diagnostics.Debug.WriteLine("Failed to serialize. Reason: " + er.Message);
+					ErrorLog.Write(er);
 				}
-			}
-			catch(Exception er)
-			{
-				// Losing the settings is better than not being able to close the program.
-                System.Diagnostics.Debug.WriteLine("Failed to serialize. Reason: " + er.Message);
-				ErrorLog.Write(er);
-			}
+			});
 			if(!e.Cancel && gFirstWindow != null){
 				// The settings are saved: a program started now may restore them, even before this one has ended.
 				try{

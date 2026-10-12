@@ -140,17 +140,59 @@ namespace UyghurEditPP
 					recent.Add(f);
 				}
 			}
-			config["IZLAR"] = recent.GetRange(0, Math.Min(maxRecent, recent.Count)).ToArray();
+			recent = recent.GetRange(0, Math.Min(maxRecent, recent.Count));
+			config["IZLAR"] = recent.ToArray();
 
+			// Only the caret positions of the recent files are kept: the others would pile up for ever.
+			HashSet<string> kept = new HashSet<string>(recent, StringComparer.OrdinalIgnoreCase);
 			Dictionary<string, int> mine = config["ORUNLAR"] as Dictionary<string, int> ?? new Dictionary<string, int>();
-			Dictionary<string, int> offsets = new Dictionary<string, int>(onDisk["ORUNLAR"] as Dictionary<string, int> ?? new Dictionary<string, int>());
+			Dictionary<string, int> offsets = new Dictionary<string, int>();
+			foreach(KeyValuePair<string, int> kv in onDisk["ORUNLAR"] as Dictionary<string, int> ?? new Dictionary<string, int>()){
+				if(kept.Contains(kv.Key)){
+					offsets[kv.Key] = kv.Value;
+				}
+			}
 			foreach(KeyValuePair<string, int> kv in mine){
-				if(used.Contains(kv.Key)){
+				if(used.Contains(kv.Key) && kept.Contains(kv.Key)){
 					offsets[kv.Key] = kv.Value;
 				}
 			}
 			config["ORUNLAR"] = offsets;
 			return true;
+		}
+
+		public const string SaveLockName = @"Local\UyghurEditPP.Settings";
+
+		/// <summary>
+		/// Runs action (read, merge and write the settings) while no other window of this
+		/// session does, so that two windows closing at once do not lose each other's lists.
+		/// After timeoutMs, or when the lock cannot be made, it runs anyway (as without the lock).
+		/// </summary>
+		public static void WithSaveLock(Action action, string name = SaveLockName, int timeoutMs = 3000)
+		{
+			System.Threading.Mutex mutex = null;
+			bool owned = false;
+			try{
+				mutex = new System.Threading.Mutex(false, name);
+				owned = mutex.WaitOne(timeoutMs);
+			}
+			catch(System.Threading.AbandonedMutexException){
+				owned = true;   // the window holding it ended without letting go: ours now
+			}
+			catch(Exception ee){
+				Log(ee);
+			}
+			try{
+				action();
+			}
+			finally{
+				if(owned){
+					mutex.ReleaseMutex();
+				}
+				if(mutex != null){
+					mutex.Dispose();
+				}
+			}
 		}
 
 		// How long a file being replaced by another window is waited for.
