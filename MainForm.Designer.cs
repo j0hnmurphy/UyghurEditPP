@@ -14,7 +14,7 @@ namespace UyghurEditPP
 		/// Designer variable used to keep track of non-visual components.
 		/// </summary>
 		private System.ComponentModel.IContainer components = null;
-		private System.Windows.Forms.ToolStrip toolBar;
+		private UyghurEditPP.KenjiToolStrip toolBar;
 		private System.Windows.Forms.MenuStrip menuBar;
 		private System.Windows.Forms.ToolStripMenuItem menuTil;
 		private System.Windows.Forms.ToolStripMenuItem menuU;
@@ -141,7 +141,7 @@ namespace UyghurEditPP
 		void InitializeComponent()
 		{
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
-            this.toolBar = new System.Windows.Forms.ToolStrip();
+            this.toolBar = new UyghurEditPP.KenjiToolStrip();
             this.toolYengi = new System.Windows.Forms.ToolStripButton();
             this.toolAch = new System.Windows.Forms.ToolStripButton();
             this.toolSaqla = new System.Windows.Forms.ToolStripButton();
