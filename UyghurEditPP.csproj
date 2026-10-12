@@ -197,6 +197,7 @@
     <Compile Include="Editing\ImeSupport.cs" />
     <Compile Include="Editing\TextAreaAutomationPeer.cs" />
     <Compile Include="Editing\TextRangeProvider.cs" />
+    <Compile Include="FindReplace\FindPattern.cs" />
     <Compile Include="FindReplace\FindReplaceDialog.xaml.cs">
       <DependentUpon>FindReplaceDialog.xaml</DependentUpon>
       <SubType>Code</SubType>

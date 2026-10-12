@@ -134,6 +134,15 @@ namespace UyghurEditPP
 			
 			gFindReplace = new FindReplaceDialog(gEditor);
 			gFindReplace.Closing+=FindReplaceClosing;
+			gFindReplace.GetEditors = () => mainTab.TabPages.Cast<TabPage>().Select(EditorOf).ToList();
+			gFindReplace.ShowEditor = ed => {
+				foreach(TabPage pg in mainTab.TabPages){
+					if(EditorOf(pg) == ed){
+						mainTab.SelectedTab = pg;
+						break;
+					}
+				}
+			};
 			ElementHost.EnableModelessKeyboardInterop(gFindReplace);
 			
 			gMenuSozToghra    = new System.Windows.Controls.MenuItem();
