@@ -934,8 +934,9 @@ namespace UyghurEditPP
 		{
 			// A second program (for example started by opening a file in Explorer) must not open
 			// the same files again: two windows would save over each other. It leaves the saved
-			// list alone, for the program that is already running.
-			if(OtherInstanceRunning()){
+			// list alone, for the first window (the owner's decision; to let every window restore, drop this check).
+			gFirstWindow = InstanceLock.TryTake(InstanceLock.DefaultName);
+			if(gFirstWindow == null){
 				gKeepOpenFiles = true;
 				return;
 			}
@@ -963,25 +964,10 @@ namespace UyghurEditPP
 			}
 		}
 
+		// Set in a window that is not the first of the session: it does not save its open files.
 		bool gKeepOpenFiles;
-
-		static bool OtherInstanceRunning()
-		{
-			try{
-				System.Diagnostics.Process me = System.Diagnostics.Process.GetCurrentProcess();
-				foreach(System.Diagnostics.Process p in System.Diagnostics.Process.GetProcessesByName(me.ProcessName)){
-					using(p){
-						if(p.Id != me.Id){
-							return true;
-						}
-					}
-				}
-			}
-			catch(Exception ee){
-				ErrorLog.Write(ee);
-			}
-			return false;
-		}
+		// Held by the first window until its settings are saved at closing.
+		InstanceLock gFirstWindow;
 
 		// Most files that come back at the next start (as many as the recent files list holds).
 		const int MaxRestoreFiles = 15;
@@ -1939,6 +1925,10 @@ namespace UyghurEditPP
 					gConfig.Remove("ACHIQ_TALLANGHAN");
 				}
 			}
+			else if(gKeepOpenFiles){
+				// The list read at the start may be out of date: the first window may have saved since.
+				AppSettings.TakeOpenFilesFromDisk(AppPaths.DataFile(AppSettings.FileName), gConfig);
+			}
 			gConfig["IZLAR"]   = gIzlar.ToArray();
 			gConfig["ORUNLAR"] = gIzOffset;
 			try
@@ -1952,6 +1942,16 @@ namespace UyghurEditPP
 				// Losing the settings is better than not being able to close the program.
                 System.Diagnostics.Debug.WriteLine("Failed to serialize. Reason: " + er.Message);
 				ErrorLog.Write(er);
+			}
+			if(!e.Cancel && gFirstWindow != null){
+				// The settings are saved: a program started now may restore them, even before this one has ended.
+				try{
+					gFirstWindow.Dispose();
+				}
+				catch(Exception ee){
+					ErrorLog.Write(ee);   // closing must not fail over this; the mutex goes with the process
+				}
+				gFirstWindow = null;
 			}
 		}
 		void MenuAxirlashturClick(object sender, EventArgs e)

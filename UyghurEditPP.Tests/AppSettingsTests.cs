@@ -295,6 +295,56 @@ namespace UyghurEditPP.Tests
 			Assert.AreEqual("a.txt", loaded["ACHIQ_TALLANGHAN"]);
 		}
 
+		// A second window closes after the first one saved its open files: it must save the
+		// first window's list, not the stale one it read at its start.
+		[TestMethod]
+		public void SecondWindowClosing_KeepsTheOpenFilesTheFirstWindowSaved()
+		{
+			Hashtable first = FullConfig();
+			first["ACHIQ"] = new[] { "new1.txt", "new2.txt" };
+			first["ACHIQ_TALLANGHAN"] = "new2.txt";
+			AppSettings.Save(gJson, first);
+
+			Hashtable second = FullConfig();
+			second["ACHIQ"] = new[] { "stale.txt" };
+			second["ACHIQ_TALLANGHAN"] = "stale.txt";
+			second["FONTSIZE"] = 30f;
+			AppSettings.TakeOpenFilesFromDisk(gJson, second);
+			AppSettings.Save(gJson, second);
+
+			Hashtable saved = AppSettings.Load(gJson, gCfg);
+			CollectionAssert.AreEqual(new[] { "new1.txt", "new2.txt" }, (string[])saved["ACHIQ"]);
+			Assert.AreEqual("new2.txt", saved["ACHIQ_TALLANGHAN"]);
+			Assert.AreEqual(30f, saved["FONTSIZE"]);   // its other settings are still saved
+		}
+
+		[TestMethod]
+		public void TakeOpenFilesFromDisk_NoListOnDisk_RemovesTheStaleOne()
+		{
+			Hashtable first = FullConfig();
+			first.Remove("ACHIQ");
+			first.Remove("ACHIQ_TALLANGHAN");
+			AppSettings.Save(gJson, first);
+			Hashtable second = FullConfig();
+			second["ACHIQ"] = new[] { "stale.txt" };
+			second["ACHIQ_TALLANGHAN"] = "stale.txt";
+			AppSettings.TakeOpenFilesFromDisk(gJson, second);
+			Assert.IsFalse(second.ContainsKey("ACHIQ_TALLANGHAN"));
+			Assert.IsTrue(second["ACHIQ"] == null || ((string[])second["ACHIQ"]).Length == 0);
+		}
+
+		[TestMethod]
+		public void TakeOpenFilesFromDisk_UnreadableFile_KeepsTheTableAndTheFile()
+		{
+			File.WriteAllText(gJson, "{ not json");
+			Hashtable second = FullConfig();
+			second["ACHIQ"] = new[] { "a.txt" };
+			AppSettings.TakeOpenFilesFromDisk(gJson, second);
+			CollectionAssert.AreEqual(new[] { "a.txt" }, (string[])second["ACHIQ"]);
+			Assert.IsTrue(File.Exists(gJson));   // not renamed to .bad-*: that is Load's job
+			Assert.AreEqual(1, gLogged.Count);
+		}
+
 		[TestMethod]
 		public void Save_WritesReadableJson()
 		{

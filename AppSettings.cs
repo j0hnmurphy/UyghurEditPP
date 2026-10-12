@@ -103,6 +103,36 @@ namespace UyghurEditPP
 		}
 
 		/// <summary>
+		/// Puts the open files list saved in jsonFile now (by the first window) into config, in
+		/// place of the one read at the start: a later window must not save its stale copy over
+		/// it. A file that cannot be read leaves config as it is (and the file in place). Never throws.
+		/// </summary>
+		public static void TakeOpenFilesFromDisk(string jsonFile, Hashtable config)
+		{
+			Hashtable onDisk;
+			try{
+				using(FileStream fs = File.OpenRead(jsonFile)){
+					onDisk = ToHashtable((Data)new DataContractJsonSerializer(typeof(Data)).ReadObject(fs) ?? new Data());
+				}
+			}
+			catch(Exception ee){
+				if(!(ee is FileNotFoundException || ee is DirectoryNotFoundException)){
+					Log(ee);
+					return;
+				}
+				onDisk = new Hashtable();   // nothing saved yet: there is no list
+			}
+			foreach(string key in new[] { "ACHIQ", "ACHIQ_TALLANGHAN" }){
+				if(onDisk.ContainsKey(key)){
+					config[key] = onDisk[key];
+				}
+				else{
+					config.Remove(key);
+				}
+			}
+		}
+
+		/// <summary>
 		/// Writes the settings to jsonFile (through a temporary file).
 		/// </summary>
 		public static void Save(string jsonFile, Hashtable config)

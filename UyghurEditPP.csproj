@@ -133,6 +133,7 @@
     <Compile Include="AppPaths.cs" />
     <Compile Include="AppSettings.cs" />
     <Compile Include="CenteredMessageBox.cs" />
+    <Compile Include="InstanceLock.cs" />
     <Compile Include="ThemedMessageBox.cs">
       <SubType>Form</SubType>
     </Compile>
