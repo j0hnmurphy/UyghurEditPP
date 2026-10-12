@@ -77,6 +77,28 @@ namespace UyghurEditPP
 		}
 
 		/// <summary>
+		/// An item added after the strip was scaled is given at 100%, like the designer's:
+		/// scale it now. (Items added at 100% before any scaling are taken by Remember.)
+		/// </summary>
+		internal void Added(ToolStripItem item)
+		{
+			if (!item.AutoSize)
+			{
+				_logicalSizes[item] = item.Size;
+				item.Size = Scaled(item.Size);
+				_appliedSizes[item] = item.Size;
+			}
+			ToolStripSplitButton split = item as ToolStripSplitButton;
+			if (split != null)
+				split.DropDownButtonWidth = Scaled(DropDownButtonWidth, _scale.Width);
+			if (item.ImageScaling == ToolStripItemImageScaling.None && item.Image != null)
+			{
+				_originalImages[item] = item.Image;
+				SetImage(item, item.Image);
+			}
+		}
+
+		/// <summary>
 		/// ToolStrip.RescaleConstantsForDpi (on a DPI change of the window, and when the handle is
 		/// created on a monitor whose DPI is not the system DPI) calls ResetScaling, which sets
 		/// ImageScalingSize to 16 px at the new DPI. Put back the size this strip is laid out for.
@@ -185,6 +207,12 @@ namespace UyghurEditPP
 		{
 			base.ScaleControl(factor, specified);
 			Scaler.Scale(factor, specified);
+		}
+
+		protected override void OnItemAdded(ToolStripItemEventArgs e)
+		{
+			base.OnItemAdded(e);
+			Scaler.Added(e.Item);
 		}
 
 		protected override void RescaleConstantsForDpi(int deviceDpiOld, int deviceDpiNew)

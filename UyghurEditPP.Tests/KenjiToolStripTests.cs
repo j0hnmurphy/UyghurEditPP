@@ -7,6 +7,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace UyghurEditPP.Tests
 {
 	[TestClass]
+	[DoNotParallelize]   // one test switches Windows Forms' process-wide DPI flags for a while
 	public class KenjiToolStripTests
 	{
 		static readonly int[] Steps = { 120, 144, 192, 96, 192, 120, 168, 144, 96, 120, 144, 192, 96, 192, 120, 168, 144, 96 };
@@ -139,6 +140,27 @@ namespace UyghurEditPP.Tests
 					Assert.AreEqual(Round(11 * dpi / 96.0), split.DropDownButtonWidth, "at " + dpi);
 				}
 				Assert.AreEqual(new Size(24, 24), strip.ImageScalingSize);
+			}
+		}
+
+		// A button added after scaling is given at 100%, like the designer's ones.
+		[TestMethod]
+		public void ItemAddedAfterScaling_IsScaledFrom100Percent()
+		{
+			using(Bitmap icon = Icon16())
+			using(KenjiToolStrip strip = new KenjiToolStrip())
+			using(ToolStripButton button = new ToolStripButton()){
+				strip.Scale(new SizeF(1.5f, 1.5f));
+				button.AutoSize = false;
+				button.Size = new Size(40, 29);
+				button.Image = icon;
+				button.ImageScaling = ToolStripItemImageScaling.None;
+				strip.Items.Add(button);
+				Assert.AreEqual(new Size(60, 44), button.Size);
+				Assert.AreEqual(new Size(24, 24), button.Image.Size);
+				strip.Scale(new SizeF(1f / 1.5f, 1f / 1.5f));
+				Assert.AreEqual(new Size(40, 29), button.Size);
+				Assert.AreSame(icon, button.Image);
 			}
 		}
 
