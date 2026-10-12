@@ -932,6 +932,13 @@ namespace UyghurEditPP
 		// same one selected; the first of them takes the empty untitled tab.
 		void RestoreOpenFiles()
 		{
+			// A second program (for example started by opening a file in Explorer) must not open
+			// the same files again: two windows would save over each other. It leaves the saved
+			// list alone, for the program that is already running.
+			if(OtherInstanceRunning()){
+				gKeepOpenFiles = true;
+				return;
+			}
 			string[] files = gConfig["ACHIQ"] as string[];
 			if(files == null){
 				return;
@@ -954,6 +961,26 @@ namespace UyghurEditPP
 					break;
 				}
 			}
+		}
+
+		bool gKeepOpenFiles;
+
+		static bool OtherInstanceRunning()
+		{
+			try{
+				System.Diagnostics.Process me = System.Diagnostics.Process.GetCurrentProcess();
+				foreach(System.Diagnostics.Process p in System.Diagnostics.Process.GetProcessesByName(me.ProcessName)){
+					using(p){
+						if(p.Id != me.Id){
+							return true;
+						}
+					}
+				}
+			}
+			catch(Exception ee){
+				ErrorLog.Write(ee);
+			}
+			return false;
 		}
 
 		// Most files that come back at the next start (as many as the recent files list holds).
@@ -1903,7 +1930,7 @@ namespace UyghurEditPP
 					break;
 				}
 			}
-			if(!e.Cancel){
+			if(!e.Cancel && !gKeepOpenFiles){
 				gConfig["ACHIQ"] = openFiles;
 				if(activeFile != null){
 					gConfig["ACHIQ_TALLANGHAN"] = activeFile;

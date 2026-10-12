@@ -206,13 +206,39 @@ namespace UyghurEditPP.Tests
 			Assert.AreEqual(0, gLogged.Count);
 		}
 
-		// The settings file as version 1.0.1 reads and writes it (no openFiles / activeFile).
+		// The settings file as version 1.0.1 reads and writes it: AppSettings.Data, Bounds and
+		// FileOffset copied from commit 43f4c7e (no openFiles / activeFile / autosaveMinutes).
 		[DataContract]
 		class Data101
 		{
 			[DataMember(Name = "language", EmitDefaultValue = false, Order = 1)] public string Language;
+			[DataMember(Name = "keyboard", EmitDefaultValue = false, Order = 2)] public string Keyboard;
+			[DataMember(Name = "autoDetectScript", EmitDefaultValue = false, Order = 3)] public bool? AutoDetectScript;
+			[DataMember(Name = "spellingScript", EmitDefaultValue = false, Order = 4)] public string SpellingScript;
+			[DataMember(Name = "fontName", EmitDefaultValue = false, Order = 5)] public string FontName;
+			[DataMember(Name = "fontSize", EmitDefaultValue = false, Order = 6)] public float? FontSize;
+			[DataMember(Name = "fontStyle", EmitDefaultValue = false, Order = 7)] public int? FontStyle;
+			[DataMember(Name = "fontWeight", EmitDefaultValue = false, Order = 8)] public int? FontWeight;
+			[DataMember(Name = "window", EmitDefaultValue = false, Order = 9)] public Bounds101 Window;
 			[DataMember(Name = "recentFiles", EmitDefaultValue = false, Order = 10)] public string[] RecentFiles;
+			[DataMember(Name = "caretOffsets", EmitDefaultValue = false, Order = 11)] public List<FileOffset101> CaretOffsets;
 			[DataMember(Name = "theme", EmitDefaultValue = false, Order = 12)] public string Theme;
+		}
+
+		[DataContract]
+		class Bounds101
+		{
+			[DataMember(Name = "x", Order = 1)] public int X;
+			[DataMember(Name = "y", Order = 2)] public int Y;
+			[DataMember(Name = "width", Order = 3)] public int Width;
+			[DataMember(Name = "height", Order = 4)] public int Height;
+		}
+
+		[DataContract]
+		class FileOffset101
+		{
+			[DataMember(Name = "file", Order = 1)] public string File;
+			[DataMember(Name = "offset", Order = 2)] public int Offset;
 		}
 
 		[TestMethod]
@@ -242,7 +268,17 @@ namespace UyghurEditPP.Tests
 			}
 
 			Assert.AreEqual("uey", old.Language);
+			Assert.AreEqual("UyghurLY", old.Keyboard);
+			Assert.AreEqual(false, old.AutoDetectScript);
+			Assert.AreEqual("ULY", old.SpellingScript);
+			Assert.AreEqual("UKIJ Tuz", old.FontName);
+			Assert.AreEqual(21.5f, old.FontSize);
+			Assert.AreEqual(1, old.FontStyle);
+			Assert.AreEqual(0, old.FontWeight);
+			Assert.AreEqual(1024, old.Window.Width);
 			Assert.AreEqual(2, old.RecentFiles.Length);
+			Assert.AreEqual(2, old.CaretOffsets.Count);
+			Assert.AreEqual(42, old.CaretOffsets[0].Offset);
 		}
 
 		[TestMethod]
