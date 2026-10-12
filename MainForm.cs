@@ -1889,8 +1889,8 @@ namespace UyghurEditPP
 					if(File.Exists(filenm)){
 						curEdit.Save(pg.Tag.ToString());
 					}
-					else{
-						SaveAs(curEdit);
+					else if(SaveAs(curEdit) == null){
+						return DialogResult.Cancel;   // the Save As box was cancelled: the text is not saved, keep the tab
 					}
 				}
 			}
