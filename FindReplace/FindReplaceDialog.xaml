@@ -12,16 +12,18 @@
 	FontSize="14"
 	Closed="Window_Closed"
 	x:Name="window1"
-	MinHeight="300"
+	MinHeight="325"
 	ResizeMode="NoResize"
 	PreviewKeyDown="window1_PreviewKeyDown"
 	MinWidth="550"
 	FontWeight="Bold"
 	VerticalAlignment="Top"
-	Height="300"
+	Height="325"
 	Width="550">
 	<Grid>
 		<Grid.RowDefinitions>
+			<RowDefinition
+				Height="Auto" />
 			<RowDefinition
 				Height="Auto" />
 			<RowDefinition
@@ -158,8 +160,15 @@
 			Grid.Column="0"
 			Grid.ColumnSpan="2"
 			Margin="5,3,0,0" />
-		<TextBlock
+		<CheckBox
+			Name="cbCrossScript"
+			Content="Match other Uyghur scripts too"
 			Grid.Row="11"
+			Grid.Column="0"
+			Grid.ColumnSpan="2"
+			Margin="5,3,0,0" />
+		<TextBlock
+			Grid.Row="12"
 			Grid.Column="0"
 			Grid.ColumnSpan="2"
 			Name="labKun"

@@ -608,5 +608,10 @@
     "uly": "Échilghan barliq betler özgertilidu.",
     "jpn": "開いているすべてのタブが変更されます。",
     "eng": "All open tabs will be changed."
+  },
+  "Match other Uyghur scripts too": {
+    "uly": "Bashqa yéziqlardiki yézilishinimu tap",
+    "jpn": "ほかの文字体系の綴りも探す",
+    "eng": "Match other Uyghur scripts too"
   }
 }

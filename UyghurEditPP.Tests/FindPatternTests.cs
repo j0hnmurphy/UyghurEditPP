@@ -115,5 +115,76 @@ namespace UyghurEditPP.Tests
 		{
 			Assert.AreEqual(FindPattern.Timeout, FindPattern.Build("a", FindMode.Normal, false, false, false).MatchTimeout);
 		}
+
+		static Regex Cross(string text, bool whole = false, FindMode mode = FindMode.Normal)
+		{
+			return FindPattern.Build(text, mode, whole, false, false, FindPattern.Timeout, true);
+		}
+
+		[TestMethod]
+		public void CrossScript_ArabicFindsLatinAndCyrillicSpellings()
+		{
+			Regex r = Cross("ئۇيغۇر");
+
+			Assert.IsTrue(r.IsMatch("ئۇيغۇر"));
+			Assert.IsTrue(r.IsMatch("bu uyghur tili"));
+			Assert.IsTrue(r.IsMatch("бу уйғур тили"));
+			Assert.IsFalse(r.IsMatch("bu qazaq tili"));
+		}
+
+		[TestMethod]
+		public void CrossScript_LatinFindsArabicAndCyrillicSpellings()
+		{
+			Regex r = Cross("uyghur");
+
+			Assert.IsTrue(r.IsMatch("UYGHUR"));
+			Assert.IsTrue(r.IsMatch("بۇ ئۇيغۇر تىلى"));
+			Assert.IsTrue(r.IsMatch("бу уйғур тили"));
+		}
+
+		[TestMethod]
+		public void CrossScript_CyrillicFindsArabicAndLatinSpellings()
+		{
+			Regex r = Cross("уйғур");
+
+			Assert.IsTrue(r.IsMatch("ئۇيغۇر"));
+			Assert.IsTrue(r.IsMatch("uyghur"));
+		}
+
+		[TestMethod]
+		public void CrossScript_WholeWord_StillStopsAtWordEnds()
+		{
+			Regex r = Cross("uyghur", whole: true);
+
+			Assert.IsTrue(r.IsMatch("بۇ ئۇيغۇر تىلى"));
+			Assert.IsTrue(r.IsMatch("bu uyghur tili"));
+			Assert.IsFalse(r.IsMatch("uyghurche"));
+			Assert.IsFalse(r.IsMatch("ئۇيغۇرچە"));
+		}
+
+		[TestMethod]
+		public void CrossScript_TextOfNoUyghurScript_IsSearchedAsTyped()
+		{
+			Regex r = Cross("12.5(");
+
+			Assert.IsTrue(r.IsMatch("a 12.5( b"));
+			Assert.IsFalse(r.IsMatch("a 12x5( b"));
+		}
+
+		[TestMethod]
+		public void CrossScript_IsIgnoredInRegularExpressionAndWildcardModes()
+		{
+			Assert.AreEqual("uyghur", FindPattern.Build("uyghur", FindMode.RegularExpression, false, false, false, FindPattern.Timeout, true).ToString());
+			Assert.AreEqual("uyghur", FindPattern.Build("uyghur", FindMode.Wildcards, false, false, false, FindPattern.Timeout, true).ToString());
+		}
+
+		[TestMethod]
+		public void CrossScript_Off_IsExactlyAsBefore()
+		{
+			Regex r = FindPattern.Build("uyghur", FindMode.Normal, false, false, false);
+
+			Assert.IsFalse(r.IsMatch("ئۇيغۇر"));
+			Assert.AreEqual("uyghur", r.ToString());
+		}
 	}
 }

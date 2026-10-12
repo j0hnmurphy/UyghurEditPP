@@ -28,6 +28,7 @@ namespace UyghurEditPP.FindReplace
 		private static bool useWildcards = false;
 		private static bool searchUp = false;
 		private static bool allTabs = false;
+		private static bool crossScript = false;
 		private TextEditor  curEditor;
 		private int         repCount = 0;
 		KUNUPKA       gKunupka = KUNUPKA.System;
@@ -44,6 +45,7 @@ namespace UyghurEditPP.FindReplace
 			cbWildcards.IsChecked = useWildcards;
 			cbSearchUp.IsChecked = searchUp;
 			cbAllTabs.IsChecked = allTabs;
+			cbCrossScript.IsChecked = crossScript;
 			
 			this.FontFamily = AppFonts.Wpf(AppFonts.UkijTuz);
 			this.FontSize = 14;
@@ -67,6 +69,7 @@ namespace UyghurEditPP.FindReplace
 			this.cbWholeWord.Content     = MainForm.gLang.GetText("Pütün söz");
 			this.cbSearchUp.Content     = MainForm.gLang.GetText("Üstige qarap izdisun");
 			this.cbAllTabs.Content      = MainForm.gLang.GetText("Search in all open tabs");
+			this.cbCrossScript.Content  = MainForm.gLang.GetText("Match other Uyghur scripts too");
 
 			this.cbRegex.Content     = MainForm.gLang.GetText("Muntizim ipade")+" (Regular Expression)";
 			this.cbWildcards.Content     = MainForm.gLang.GetText("Alahide belgiler") + "(\\t,\\n,\\r...)";
@@ -206,6 +209,7 @@ namespace UyghurEditPP.FindReplace
 			useWildcards = (cbWildcards.IsChecked == true);
 			searchUp = (cbSearchUp.IsChecked == true);
 			allTabs = (cbAllTabs.IsChecked == true);
+			crossScript = (cbCrossScript.IsChecked == true);
 		}
 
 		// Why a search could not be done; the text is shown in the window.
@@ -442,7 +446,7 @@ namespace UyghurEditPP.FindReplace
 				: cbWildcards.IsChecked == true ? FindMode.Wildcards : FindMode.RegularExpression;
 			try{
 				return FindPattern.Build(textToFind, mode, cbWholeWord.IsChecked == true, cbCaseSensitive.IsChecked == true,
-					cbSearchUp.IsChecked == true && !leftToRight);
+					cbSearchUp.IsChecked == true && !leftToRight, FindPattern.Timeout, cbCrossScript.IsChecked == true);
 			}
 			catch(ArgumentException){
 				throw new SearchException(MainForm.gLang.GetText("The regular expression is not valid."));
