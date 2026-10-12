@@ -1005,9 +1005,23 @@ namespace UyghurEditPP
 		}
 		readonly Dictionary<TextEditor, RecoveryTab> gRecoveryTabs = new Dictionary<TextEditor, RecoveryTab>();
 
+		// Set when a copy could not be made (no permission, disk full, text too long):
+		// the changes are then not copied at once any more, only by the timer.
+		bool gRecoveryBroken;
+
 		static TextEditor EditorOf(TabPage pg)
 		{
 			return (TextEditor)((ElementHost)pg.Controls[0]).Child;
+		}
+
+		TabPage TabOf(TextEditor ed)
+		{
+			foreach(TabPage pg in mainTab.TabPages){
+				if(pg.Controls.Count > 0 && EditorOf(pg) == ed){
+					return pg;
+				}
+			}
+			return null;
 		}
 
 		void StartRecovery()
@@ -1056,6 +1070,10 @@ namespace UyghurEditPP
 					return true;
 				}
 				ITextSource snapshot = ed.Document.CreateSnapshot();
+				if(snapshot.TextLength > Recovery.MaxChars){
+					gRecoveryBroken = true;
+					return false;
+				}
 				if(state != null && snapshot.Version.BelongsToSameDocumentAs(state.Version) && snapshot.Version.CompareAge(state.Version) == 0){
 					return true;
 				}
@@ -1068,12 +1086,15 @@ namespace UyghurEditPP
 				string title = pg.Text.StartsWith("*") ? pg.Text.Substring(1) : pg.Text;
 				bool bom = ed.Encoding != null && ed.Encoding.GetPreamble().Length > 0;
 				if(!gRecovery.Save(id, string.IsNullOrEmpty(path) ? null : path, title, ed.CodePage, bom, snapshot.Text)){
+					gRecoveryBroken = true;
 					return false;
 				}
 				gRecoveryTabs[ed] = new RecoveryTab{Id = id, Version = snapshot.Version};
+				gRecoveryBroken = false;
 				return true;
 			}
 			catch(Exception ee){
+				gRecoveryBroken = true;
 				ErrorLog.Write(ee);
 				return false;
 			}
@@ -1685,8 +1706,18 @@ namespace UyghurEditPP
 		
 		void TextOzgerdi(object sender, EventArgs e){
 			TextEditor changed = sender as TextEditor;
-			if(changed != null && !changed.IsModified && gRecoveryTabs.Count > 0){
-				ForgetRecovery(changed);   // saved, or undone back to the saved text
+			if(changed != null && gRecovery != null){
+				if(!changed.IsModified){
+					ForgetRecovery(changed);   // saved, or undone back to the saved text
+				}
+				else if(!gRecoveryBroken && !gRecoveryTabs.ContainsKey(changed)){
+					// The first change of a document, or the save failed after all: the copy is made
+					// at once, the timer then keeps it up to date.
+					TabPage pg = TabOf(changed);
+					if(pg != null){
+						SaveRecoveryCopy(pg);
+					}
+				}
 			}
 			UpdateToolbar();
 		}
