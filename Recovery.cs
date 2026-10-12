@@ -9,6 +9,11 @@
  * is no longer running knows that process did not exit normally. Two programs running at
  * the same time never touch each other's files. All writes go through SafeFile.
  *
+ * At the start, each leftover is first taken over by renaming its index to
+ * claimed-<process id>-<start time>-<old name>, so that two windows started together do not
+ * both offer it; one taken by a program that is no longer running can be taken again. Old
+ * files are deleted only after the question was answered, never a leftover not yet offered.
+ *
  * Not thread safe: use it from the UI thread.
  */
 using System;
@@ -19,6 +24,7 @@ using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
 using System.Text.RegularExpressions;
+using UyghurEditPP.Document;
 
 namespace UyghurEditPP
 {
@@ -51,6 +57,10 @@ namespace UyghurEditPP
 			[DataMember(Name = "bom", EmitDefaultValue = false, Order = 6)] public bool Bom;
 			// When the copy was written (UTC ticks).
 			[DataMember(Name = "saved", Order = 5)] public long Saved;
+			// The file as it was when the document was loaded or saved last (UTC ticks, bytes);
+			// none (0) when not known.
+			[DataMember(Name = "fileTime", EmitDefaultValue = false, Order = 7)] public long FileTime;
+			[DataMember(Name = "fileLength", EmitDefaultValue = false, Order = 8)] public long FileLength;
 		}
 
 		[DataContract]
@@ -100,6 +110,20 @@ namespace UyghurEditPP
 			public bool Bom{ get{ return gDocument.Bom; } }
 			public DateTime SavedUtc{ get{ return new DateTime(gDocument.Saved, DateTimeKind.Utc); } }
 			public string Id{ get{ return gDocument.Id; } }
+
+			/// <summary>
+			/// Whether the file is still exactly as it was when the document was loaded or saved
+			/// last (same time and length), so the copy can go back into its own tab. False when
+			/// that is not known or the file is gone.
+			/// </summary>
+			public bool FileUnchanged()
+			{
+				if(string.IsNullOrEmpty(Path) || gDocument.FileTime == 0){
+					return false;
+				}
+				FileInfo fi = new FileInfo(Path);
+				return fi.Exists && fi.LastWriteTimeUtc.Ticks == gDocument.FileTime && fi.Length == gDocument.FileLength;
+			}
 
 			/// <summary>The copied text. Throws when it cannot be read.</summary>
 			public string ReadText()
@@ -165,12 +189,43 @@ namespace UyghurEditPP
 		}
 
 		/// <summary>
-		/// Writes (or replaces) the copy <paramref name="id"/>. Returns false, writing nothing,
+		/// Notes in the error log that a document is not copied because it is too long.
+		/// Only logged, by the owner's decision: the window does not warn.
+		/// </summary>
+		public static void ReportTooLong(string title, int length)
+		{
+			Log(new InvalidOperationException("No recovery copy is kept of \"" + title + "\": " + length + " characters, more than " + MaxChars + "."));
+		}
+
+		/// <summary>
+		/// What was last written for a document. The copy is written again when any of it
+		/// changes: the text, the encoding, or the file it belongs to.
+		/// </summary>
+		public sealed class Written
+		{
+			public string Id;
+			public ITextSourceVersion Version;
+			public int CodePage;
+			public bool Bom;
+			public long FileTime;
+			public long FileLength;
+
+			public bool Same(ITextSourceVersion version, int codePage, bool bom, long fileTime, long fileLength)
+			{
+				return Version != null && version.BelongsToSameDocumentAs(Version) && version.CompareAge(Version) == 0
+					&& codePage == CodePage && bom == Bom && fileTime == FileTime && fileLength == FileLength;
+			}
+		}
+
+		/// <summary>
+		/// Writes (or replaces) the copy <paramref name="id"/>. fileTime and fileLength are those
+		/// of the file as loaded or saved last (0 when not known). Returns false, writing nothing,
 		/// when the text is too long. Throws when a file cannot be written.
 		/// </summary>
-		public bool Save(string id, string path, string title, int codePage, bool bom, string text)
+		public bool Save(string id, string path, string title, int codePage, bool bom, string text, long fileTime = 0, long fileLength = 0)
 		{
 			if(text.Length > MaxChars){
+				ReportTooLong(title, text.Length);
 				return false;
 			}
 			Directory.CreateDirectory(gFolder);
@@ -188,6 +243,8 @@ namespace UyghurEditPP
 			doc.Title = title;
 			doc.CodePage = codePage;
 			doc.Bom = bom;
+			doc.FileTime = fileTime;
+			doc.FileLength = fileLength;
 			doc.Saved = DateTime.UtcNow.Ticks;
 			WriteIndex();
 			return true;
@@ -284,6 +341,34 @@ namespace UyghurEditPP
 			}
 		}
 
+		static readonly Regex gClaimed = new Regex(@"^claimed-(\d+)-(\d+)-(recovery-.+\.json)$", RegexOptions.IgnoreCase);
+
+		// The index files in the folder: those of the programs, and those taken over at a start.
+		static IEnumerable<string> IndexFiles(string folder)
+		{
+			foreach(string file in Directory.GetFiles(folder, "recovery-*.json")){
+				yield return file;
+			}
+			foreach(string file in Directory.GetFiles(folder, "claimed-*.json")){
+				yield return file;
+			}
+		}
+
+		// Whether the program the index file belongs to is running: the one that took it over,
+		// or else the one that wrote it.
+		static bool OwnerRunning(string file, Index index, Func<int, long, bool> isRunning)
+		{
+			Match m = gClaimed.Match(System.IO.Path.GetFileName(file));
+			if(m.Success){
+				int pid;
+				long started;
+				if(int.TryParse(m.Groups[1].Value, out pid) && long.TryParse(m.Groups[2].Value, out started)){
+					return isRunning(pid, started);
+				}
+			}
+			return isRunning(index.Pid, index.Started);
+		}
+
 		/// <summary>
 		/// The copies of programs that are no longer running, those with at least one readable
 		/// copy. An index that cannot be read is skipped (and kept).
@@ -294,10 +379,10 @@ namespace UyghurEditPP
 			if(!Directory.Exists(folder)){
 				return found;
 			}
-			foreach(string file in Directory.GetFiles(folder, "recovery-*.json")){
+			foreach(string file in IndexFiles(folder)){
 				try{
 					Index index = ReadIndex(file);
-					if(index == null || index.Documents == null || isRunning(index.Pid, index.Started)){
+					if(index == null || index.Documents == null || OwnerRunning(file, index, isRunning)){
 						continue;
 					}
 					Leftover left = new Leftover{IndexFile = file, Pid = index.Pid, Folder = folder};
@@ -315,6 +400,28 @@ namespace UyghurEditPP
 				}
 			}
 			return found;
+		}
+
+		/// <summary>
+		/// Takes a leftover over for the program pid (started at startedUtcTicks), by renaming its
+		/// index. Only one program can do so: false when another one took it first.
+		/// </summary>
+		public static bool Claim(Leftover left, int pid, long startedUtcTicks)
+		{
+			string name = System.IO.Path.GetFileName(left.IndexFile);
+			Match m = gClaimed.Match(name);
+			string claimed = System.IO.Path.Combine(left.Folder, "claimed-" + pid + "-" + startedUtcTicks + "-" + (m.Success ? m.Groups[3].Value : name));
+			try{
+				File.Move(left.IndexFile, claimed);
+			}
+			catch(Exception ee){
+				if(!(ee is FileNotFoundException)){
+					Log(ee);   // not merely taken by another program
+				}
+				return false;
+			}
+			left.IndexFile = claimed;
+			return true;
 		}
 
 		/// <summary>Deletes a leftover: its index and all its copies. Never throws.</summary>
@@ -337,34 +444,83 @@ namespace UyghurEditPP
 		}
 
 		/// <summary>
-		/// Deletes the files in the folder that were last written before olderThan, except
-		/// the copies named by the index of a running program. Returns how many were deleted.
+		/// What happens at the start: the leftovers of programs that did not exit normally are
+		/// taken over (see Claim) and, if there are any, ask() is called once. On "No" (false)
+		/// they are deleted; on "Yes" (true) each one restore() returns true for is deleted.
+		/// Only then the files older than olderThan are deleted (see DeleteOld), except those
+		/// just offered. pid and startedUtcTicks are this program's.
 		/// </summary>
-		public static int DeleteOld(string folder, DateTime olderThan, Func<int, long, bool> isRunning)
+		public static void Offer(string folder, int pid, long startedUtcTicks, Func<int, long, bool> isRunning, DateTime olderThan, Func<bool?> ask, Func<Leftover, bool> restore)
+		{
+			List<Leftover> found = FindLeftovers(folder, isRunning);
+			// Kept from the cleanup: also a leftover that could not be taken over (held open, for
+			// example), which is then offered at a later start.
+			HashSet<string> offered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			foreach(Leftover left in found){
+				offered.Add(left.IndexFile);
+			}
+			List<Leftover> mine = found.FindAll(left => Claim(left, pid, startedUtcTicks));
+			if(mine.Count > 0){
+				foreach(Leftover left in mine){
+					offered.Add(left.IndexFile);
+				}
+				bool? answer = ask();
+				foreach(Leftover left in mine){
+					// A leftover is deleted only after an explicit "No", or once all its documents
+					// are back in tabs (and have copies of their own); otherwise it stays for the next start.
+					if(answer == false || (answer == true && restore(left))){
+						Discard(left);
+					}
+				}
+			}
+			try{
+				DeleteOld(folder, olderThan, isRunning, offered);
+			}
+			catch(Exception ee){
+				Log(ee);
+			}
+		}
+
+		/// <summary>
+		/// Deletes the files in the folder last written before olderThan. The files of a program
+		/// (its index and its copies) are judged together, by the newest of them, and kept while
+		/// that program (or the one that took them over) runs, or when keepIndexFiles names the
+		/// index. Returns how many files were deleted.
+		/// </summary>
+		public static int DeleteOld(string folder, DateTime olderThan, Func<int, long, bool> isRunning, ICollection<string> keepIndexFiles = null)
 		{
 			if(!Directory.Exists(folder)){
 				return 0;
 			}
+			DateTime limit = olderThan.ToUniversalTime();
 			HashSet<string> keep = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-			foreach(string file in Directory.GetFiles(folder, "recovery-*.json")){
+			foreach(string file in IndexFiles(folder)){
 				try{
 					Index index = ReadIndex(file);
-					if(index != null && index.Documents != null && isRunning(index.Pid, index.Started)){
-						keep.Add(System.IO.Path.GetFileName(file));
-						foreach(Copy d in index.Documents){
-							if(d != null && d.Id != null){
-								keep.Add(d.Id + ".txt");
-							}
+					if(index == null || index.Documents == null){
+						continue;
+					}
+					List<string> session = new List<string>{ System.IO.Path.GetFileName(file) };
+					foreach(Copy d in index.Documents){
+						if(d != null && d.Id != null && gIdPattern.IsMatch(d.Id)){
+							session.Add(d.Id + ".txt");
 						}
+					}
+					bool recent = session.Exists(name => {
+						string f = System.IO.Path.Combine(folder, name);
+						return File.Exists(f) && File.GetLastWriteTimeUtc(f) >= limit;
+					});
+					if(recent || (keepIndexFiles != null && keepIndexFiles.Contains(file)) || OwnerRunning(file, index, isRunning)){
+						keep.UnionWith(session);
 					}
 				}
 				catch(Exception ee){
-					Log(ee);
+					Log(ee);   // an index that cannot be read is judged by its own age, below
 				}
 			}
 			int count = 0;
 			foreach(string file in Directory.GetFiles(folder)){
-				if(keep.Contains(System.IO.Path.GetFileName(file)) || File.GetLastWriteTime(file) >= olderThan){
+				if(keep.Contains(System.IO.Path.GetFileName(file)) || File.GetLastWriteTimeUtc(file) >= limit){
 					continue;
 				}
 				try{

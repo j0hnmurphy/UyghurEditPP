@@ -275,6 +275,200 @@ namespace UyghurEditPP.Tests
 			CollectionAssert.AreEquivalent(new[] { "R", "F" }, rest.Select(l => l.Items.Single().ReadText()).ToArray());
 		}
 
+		static void Age(string file, int days)
+		{
+			File.SetLastWriteTimeUtc(file, DateTime.UtcNow.AddDays(-days));
+		}
+
+		string CopyFile(string id)
+		{
+			return Path.Combine(gFolder, id + ".txt");
+		}
+
+		// Review finding 1: a copy that was not rewritten for 30 days belongs to a session that
+		// wrote another copy recently; it was deleted alone and never offered.
+		[TestMethod]
+		public void DeleteOld_KeepsAnOldCopyOfASessionThatWroteRecently()
+		{
+			Recovery dead = New(2, 20);
+			string untouched = Recovery.NewId(), recent = Recovery.NewId();
+			dead.Save(untouched, null, "untouched", 0, false, "U");
+			dead.Save(recent, null, "recent", 0, false, "N");
+			Age(CopyFile(untouched), 40);
+
+			Recovery.DeleteOld(gFolder, DateTime.UtcNow.AddDays(-30), Dead);
+
+			Assert.IsTrue(File.Exists(CopyFile(untouched)));
+			Assert.AreEqual(2, Recovery.FindLeftovers(gFolder, Dead)[0].Items.Count());
+		}
+
+		[TestMethod]
+		public void DeleteOld_RemovesASessionWhoseFilesAreAllOld_AsAWhole()
+		{
+			Recovery dead = New(2, 20);
+			dead.Save(Recovery.NewId(), null, "a", 0, false, "A");
+			foreach(string f in Files()){
+				Age(f, 40);
+			}
+			Assert.AreEqual(2, Recovery.DeleteOld(gFolder, DateTime.UtcNow.AddDays(-30), Dead));
+			Assert.AreEqual(0, Files().Length);
+		}
+
+		// Review finding 1: the cleanup ran before the question, so an old leftover was deleted
+		// without being offered.
+		[TestMethod]
+		public void Offer_AsksBeforeAnOldLeftoverIsDeleted()
+		{
+			New(2, 20).Save(Recovery.NewId(), null, "old", 0, false, "O");
+			foreach(string f in Files()){
+				Age(f, 40);
+			}
+			int asked = 0;
+			// "Yes", but the document could not be restored: everything stays for the next start.
+			Recovery.Offer(gFolder, 300, 30, Dead, DateTime.UtcNow.AddDays(-30), () => { asked++; return true; }, left => false);
+
+			Assert.AreEqual(1, asked);
+			Assert.AreEqual(2, Files().Length);
+
+			Recovery.Offer(gFolder, 400, 40, Dead, DateTime.UtcNow.AddDays(-30), () => false, left => true);
+			Assert.AreEqual(0, Files().Length, "after No");
+		}
+
+		// Code review: a leftover that could not be taken over (its index held open, for example by
+		// a virus scanner) was not offered, and the cleanup then deleted its old copy.
+		[TestMethod]
+		public void Offer_LeftoverThatCannotBeTakenOver_IsNotDeletedUnoffered()
+		{
+			string id = Recovery.NewId();
+			New(2, 20).Save(id, null, "old", 0, false, "O");
+			foreach(string f in Files()){
+				Age(f, 40);
+			}
+			string index = Files("recovery-*.json").Single();
+			using(new FileStream(index, FileMode.Open, FileAccess.Read, FileShare.Read)){
+				Recovery.Offer(gFolder, 300, 30, Dead, DateTime.UtcNow.AddDays(-30), () => { Assert.Fail("asked"); return null; }, left => true);
+			}
+			Assert.IsTrue(File.Exists(CopyFile(id)));
+			Assert.AreEqual(1, Recovery.FindLeftovers(gFolder, Dead).Count, "offered at the next start");
+		}
+
+		[TestMethod]
+		public void Offer_CleanupNeverTouchesTheRunningProgramsCopies()
+		{
+			Recovery me = New(300, 30);
+			me.Save(Recovery.NewId(), null, "mine", 0, false, "M");
+			foreach(string f in Files()){
+				Age(f, 40);
+			}
+			Recovery.Offer(gFolder, 300, 30, (pid, started) => pid == 300, DateTime.UtcNow.AddDays(-30), () => { Assert.Fail("asked"); return null; }, left => true);
+			Assert.AreEqual(2, Files().Length);
+		}
+
+		// Review finding 3: two windows started together both offered the same leftover; one
+		// "No" deleted what the other was restoring.
+		[TestMethod]
+		public void Offer_TwoWindows_OnlyOneAsks()
+		{
+			New(100, 10).Save(Recovery.NewId(), null, "crashed", 0, false, "C");
+			Func<int, long, bool> windowsRunning = (pid, started) => pid == 200 || pid == 300;
+			int askedA = 0, askedB = 0;
+			Recovery.Offer(gFolder, 200, 20, windowsRunning, DateTime.UtcNow.AddDays(-30), () => {
+				askedA++;
+				// While A's question is open, window B starts.
+				Recovery.Offer(gFolder, 300, 30, windowsRunning, DateTime.UtcNow.AddDays(-30), () => { askedB++; return false; }, left => true);
+				Assert.AreEqual(1, Files("*.txt").Length, "B must not delete what A offers");
+				return true;
+			}, left => left.Items.Single().ReadText() == "C");
+
+			Assert.AreEqual(1, askedA);
+			Assert.AreEqual(0, askedB);
+			Assert.AreEqual(0, Files().Length, "restored by A, then deleted");
+		}
+
+		[TestMethod]
+		public void Offer_LeftoverTakenByAWindowThatEnded_IsOfferedAgain()
+		{
+			New(100, 10).Save(Recovery.NewId(), null, "crashed", 0, false, "C");
+			bool aRunning = true;
+			Func<int, long, bool> running = (pid, started) => pid == 200 ? aRunning : false;
+			// A takes it, but restoring fails: it keeps it while it runs.
+			Recovery.Offer(gFolder, 200, 20, running, DateTime.UtcNow.AddDays(-30), () => true, left => false);
+			Assert.AreEqual(0, Recovery.FindLeftovers(gFolder, running).Count, "A still runs");
+
+			aRunning = false;
+			int asked = 0;
+			string text = null;
+			Recovery.Offer(gFolder, 300, 30, running, DateTime.UtcNow.AddDays(-30), () => { asked++; return true; }, left => { text = left.Items.Single().ReadText(); return true; });
+			Assert.AreEqual(1, asked);
+			Assert.AreEqual("C", text);
+			Assert.AreEqual(0, Files().Length);
+		}
+
+		// Review finding 6: whether the file is unchanged was judged by the time of the copy,
+		// not by the file as it was loaded; a change between loading and the first copy was missed.
+		[TestMethod]
+		public void FileChangedAfterLoading_BeforeTheCopy_IsNotUnchanged()
+		{
+			Directory.CreateDirectory(gFolder);
+			string file = Path.Combine(gFolder, "doc.txt");
+			File.WriteAllText(file, "as loaded");
+			FileInfo loaded = new FileInfo(file);
+			long loadedTime = DateTime.UtcNow.AddMinutes(-10).Ticks;
+			File.SetLastWriteTimeUtc(file, new DateTime(loadedTime, DateTimeKind.Utc));
+			// Another program writes the file, then our copy is made.
+			File.WriteAllText(file, "written by another program");
+			File.SetLastWriteTimeUtc(file, DateTime.UtcNow.AddMinutes(-5));
+			New().Save(Recovery.NewId(), file, "doc.txt", 65001, false, "edited", loadedTime, loaded.Length);
+
+			Assert.IsFalse(Recovery.FindLeftovers(gFolder, Dead)[0].Items.Single().FileUnchanged());
+		}
+
+		[TestMethod]
+		public void FileAsLoaded_IsUnchanged_OtherwiseNot()
+		{
+			Directory.CreateDirectory(gFolder);
+			string file = Path.Combine(gFolder, "doc.txt");
+			File.WriteAllText(file, "as loaded");
+			FileInfo fi = new FileInfo(file);
+			New(1).Save(Recovery.NewId(), file, "with", 65001, false, "edited", fi.LastWriteTimeUtc.Ticks, fi.Length);
+			// A copy without the file's details (it cannot be told): not unchanged.
+			New(2).Save(Recovery.NewId(), file, "without", 65001, false, "edited");
+			List<Recovery.LeftoverCopy> found = Recovery.FindLeftovers(gFolder, Dead).Select(l => l.Items.Single()).ToList();
+			Recovery.LeftoverCopy withDetails = found.Single(c => c.Title == "with");
+			Recovery.LeftoverCopy without = found.Single(c => c.Title == "without");
+
+			Assert.IsTrue(withDetails.FileUnchanged());
+			Assert.IsFalse(without.FileUnchanged());
+			File.AppendAllText(file, "!");
+			File.SetLastWriteTimeUtc(file, fi.LastWriteTimeUtc);   // same time, other length
+			Assert.IsFalse(withDetails.FileUnchanged());
+			File.Delete(file);
+			Assert.IsFalse(withDetails.FileUnchanged());
+		}
+
+		// Review finding 7: a copy was not written again when only the encoding changed.
+		[TestMethod]
+		public void Written_IsOutOfDate_WhenOnlyTheEncodingOrBomChanged()
+		{
+			UyghurEditPP.Document.TextDocument doc = new UyghurEditPP.Document.TextDocument("text");
+			Recovery.Written w = new Recovery.Written{ Id = Recovery.NewId(), Version = doc.Version, CodePage = 65001, Bom = false };
+
+			Assert.IsTrue(w.Same(doc.Version, 65001, false, 0, 0));
+			Assert.IsFalse(w.Same(doc.Version, 932, false, 0, 0));
+			Assert.IsFalse(w.Same(doc.Version, 65001, true, 0, 0));
+			doc.Insert(0, "x");
+			Assert.IsFalse(w.Same(doc.Version, 65001, false, 0, 0));
+		}
+
+		// Review finding 8: a document too long to copy had no protection, silently.
+		[TestMethod]
+		public void TooLongText_IsLogged()
+		{
+			New().Save(Recovery.NewId(), null, "t", 0, false, new string('a', Recovery.MaxChars + 1));
+			Assert.AreEqual(1, gLogged.Count);
+			StringAssert.Contains(gLogged[0].Message, "t");
+		}
+
 		[TestMethod]
 		public void DeleteOld_NoFolder_ReturnsZero()
 		{

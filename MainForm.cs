@@ -995,15 +995,13 @@ namespace UyghurEditPP
 		// Copies of the modified documents are kept while the program runs (see Recovery), and
 		// are offered again at the next start if the program did not exit normally.
 		Recovery gRecovery;   // null when it cannot be used, or once the program is closing
+		long     gRecoveryStarted;   // when this program started (UTC ticks), as in its index file name
 		Timer    gAutosaveTimer;
 
-		// The copy kept for an editor, and the text version it was made from.
-		sealed class RecoveryTab
-		{
-			public string Id;
-			public ITextSourceVersion Version;
-		}
-		readonly Dictionary<TextEditor, RecoveryTab> gRecoveryTabs = new Dictionary<TextEditor, RecoveryTab>();
+		// The copy kept for an editor, and what it was made from.
+		readonly Dictionary<TextEditor, Recovery.Written> gRecoveryTabs = new Dictionary<TextEditor, Recovery.Written>();
+		// Editors too long to copy that were noted in the error log already (once each).
+		readonly HashSet<TextEditor> gTooLongReported = new HashSet<TextEditor>();
 
 		// Set when a copy could not be made (no permission, disk full, text too long):
 		// the changes are then not copied at once any more, only by the timer.
@@ -1028,8 +1026,8 @@ namespace UyghurEditPP
 		{
 			try{
 				System.Diagnostics.Process me = System.Diagnostics.Process.GetCurrentProcess();
-				gRecovery = new Recovery(Recovery.DefaultFolder, me.Id, me.StartTime.ToUniversalTime());
-				Recovery.DeleteOld(Recovery.DefaultFolder, DateTime.Now.AddDays(-Recovery.KeepDays), Recovery.IsRunning);
+				gRecoveryStarted = me.StartTime.ToUniversalTime().Ticks;
+				gRecovery = new Recovery(Recovery.DefaultFolder, me.Id, new DateTime(gRecoveryStarted, DateTimeKind.Utc));
 			}
 			catch(Exception ee){
 				ErrorLog.Write(ee);
@@ -1063,33 +1061,41 @@ namespace UyghurEditPP
 			}
 			try{
 				TextEditor ed = EditorOf(pg);
-				RecoveryTab state;
+				Recovery.Written state;
 				gRecoveryTabs.TryGetValue(ed, out state);
 				if(!ed.IsModified){
 					ForgetRecovery(ed);
 					return true;
 				}
+				string title = pg.Text.StartsWith("*") ? pg.Text.Substring(1) : pg.Text;
 				ITextSource snapshot = ed.Document.CreateSnapshot();
 				if(snapshot.TextLength > Recovery.MaxChars){
+					if(gTooLongReported.Add(ed)){
+						Recovery.ReportTooLong(title, snapshot.TextLength);
+					}
 					gRecoveryBroken = true;
 					return false;
 				}
-				if(state != null && snapshot.Version.BelongsToSameDocumentAs(state.Version) && snapshot.Version.CompareAge(state.Version) == 0){
+				string path = pg.Tag as string;
+				if(string.IsNullOrEmpty(path)){
+					path = null;
+				}
+				bool bom = ed.Encoding != null && ed.Encoding.GetPreamble().Length > 0;
+				// The file as loaded or saved last: whether it changed since is judged by this at the restore.
+				long fileTime = path != null ? ed.FileTime : 0, fileLength = path != null ? ed.FileLength : 0;
+				if(state != null && state.Same(snapshot.Version, ed.CodePage, bom, fileTime, fileLength)){
 					return true;
 				}
-				string path = pg.Tag as string;
-				if(string.IsNullOrEmpty(path) && snapshot.TextLength == 0){
+				if(path == null && snapshot.TextLength == 0){
 					ForgetRecovery(ed);   // nothing worth keeping in a new document
 					return true;
 				}
 				string id = state != null ? state.Id : Recovery.NewId();
-				string title = pg.Text.StartsWith("*") ? pg.Text.Substring(1) : pg.Text;
-				bool bom = ed.Encoding != null && ed.Encoding.GetPreamble().Length > 0;
-				if(!gRecovery.Save(id, string.IsNullOrEmpty(path) ? null : path, title, ed.CodePage, bom, snapshot.Text)){
+				if(!gRecovery.Save(id, path, title, ed.CodePage, bom, snapshot.Text, fileTime, fileLength)){
 					gRecoveryBroken = true;
 					return false;
 				}
-				gRecoveryTabs[ed] = new RecoveryTab{Id = id, Version = snapshot.Version};
+				gRecoveryTabs[ed] = new Recovery.Written{Id = id, Version = snapshot.Version, CodePage = ed.CodePage, Bom = bom, FileTime = fileTime, FileLength = fileLength};
 				gRecoveryBroken = false;
 				return true;
 			}
@@ -1103,7 +1109,7 @@ namespace UyghurEditPP
 		// The editor was saved, or its tab closed: its copy is not needed any more.
 		void ForgetRecovery(TextEditor ed)
 		{
-			RecoveryTab state;
+			Recovery.Written state;
 			if(gRecovery == null || !gRecoveryTabs.TryGetValue(ed, out state)){
 				return;
 			}
@@ -1133,33 +1139,32 @@ namespace UyghurEditPP
 			if(gRecovery == null || IsDisposed){
 				return;
 			}
-			List<Recovery.Leftover> found;
+			// Files whose recovered text went to a new tab because they changed after it was copied.
+			List<string> changedFiles = new List<string>();
 			try{
-				found = Recovery.FindLeftovers(Recovery.DefaultFolder, Recovery.IsRunning);
+				// Old files are deleted only after the question is answered (Recovery.Offer).
+				Recovery.Offer(Recovery.DefaultFolder, System.Diagnostics.Process.GetCurrentProcess().Id, gRecoveryStarted, Recovery.IsRunning,
+					DateTime.UtcNow.AddDays(-Recovery.KeepDays),
+					() => {
+						DialogResult dr = CenteredMessageBox.Show(this, gLang.GetText("The program did not close normally last time. Restore the unsaved documents?"), "UyghurEdit++ v" + GetVersion(), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+						return dr == DialogResult.Yes ? true : dr == DialogResult.No ? false : (bool?)null;
+					},
+					left => RestoreLeftover(left, changedFiles));
 			}
 			catch(Exception ee){
 				ErrorLog.Write(ee);
-				return;
 			}
-			if(found.Count == 0){
-				return;
-			}
-			DialogResult dr = CenteredMessageBox.Show(this, gLang.GetText("The program did not close normally last time. Restore the unsaved documents?"), "UyghurEdit++ v" + GetVersion(), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-			foreach(Recovery.Leftover left in found){
-				// A leftover is deleted only after an explicit "No", or once all its documents
-				// are back in tabs (and have copies of their own); otherwise it stays for the next start.
-				if(dr == DialogResult.No || (dr == DialogResult.Yes && RestoreLeftover(left))){
-					Recovery.Discard(left);
-				}
+			if(changedFiles.Count > 0){
+				CenteredMessageBox.Show(this, gLang.GetText("These files were changed or removed after the copies were made. The recovered text is in new tabs; the files were not changed:") + "\n\n" + string.Join("\n", changedFiles), "UyghurEdit++ v" + GetVersion(), MessageBoxButtons.OK, MessageBoxIcon.Information);
 			}
 		}
 
-		bool RestoreLeftover(Recovery.Leftover left)
+		bool RestoreLeftover(Recovery.Leftover left, List<string> changedFiles)
 		{
 			bool all = true;
 			foreach(Recovery.LeftoverCopy item in left.Items){
 				try{
-					all &= RestoreCopy(item);
+					all &= RestoreCopy(item, changedFiles);
 				}
 				catch(Exception ee){
 					ErrorLog.Write(ee);
@@ -1169,14 +1174,16 @@ namespace UyghurEditPP
 			return all;
 		}
 
-		bool RestoreCopy(Recovery.LeftoverCopy item)
+		bool RestoreCopy(Recovery.LeftoverCopy item, List<string> changedFiles)
 		{
 			string text = item.ReadText();
 			string path = item.Path;
-			// The copy goes back into the file's own tab only if the file has not changed since
-			// the copy was made; otherwise saving would overwrite the newer file.
-			bool ownTab = !string.IsNullOrEmpty(path) && File.Exists(path) && !IsImageFile(path)
-				&& File.GetLastWriteTimeUtc(path) <= item.SavedUtc.AddSeconds(2);
+			// The copy goes back into the file's own tab only if the file is still as it was when
+			// the document was loaded or saved; otherwise saving would overwrite the newer file.
+			bool ownTab = item.FileUnchanged() && !IsImageFile(path);
+			if(!ownTab && !string.IsNullOrEmpty(path)){
+				changedFiles.Add(path);
+			}
 			if(ownTab){
 				OpenaFile(path);
 				if(gEditor.IsModified){
@@ -1795,7 +1802,7 @@ namespace UyghurEditPP
 		void MenuSaqlaClick(object sender, EventArgs e)
 		{
 			if(File.Exists(mainTab.SelectedTab.Tag.ToString())){
-				gEditor.Save(mainTab.SelectedTab.Tag.ToString());
+				SaveEditor(gEditor, mainTab.SelectedTab.Tag.ToString());
 				if(mainTab.SelectedTab.Text.StartsWith("*")){
 					mainTab.SelectedTab.Text= mainTab.SelectedTab.Text.Substring(1);
 				}
@@ -1818,13 +1825,29 @@ namespace UyghurEditPP
 			UpdateToolbar();
 		}
 		
+		// Saves the editor to the file. Its recovery copy is deleted only once the file is written
+		// (TextEditor.Save); when saving fails, the copy is brought up to date at once.
+		void SaveEditor(TextEditor ed, string fileName)
+		{
+			try{
+				ed.Save(fileName);
+			}
+			catch{
+				TabPage pg = TabOf(ed);
+				if(pg != null){
+					SaveRecoveryCopy(pg);
+				}
+				throw;
+			}
+		}
+
 		string SaveAs(TextEditor curEdit, string fileName = null){
 			SaveFileDialog sfd = new SaveFileDialog();
 			sfd.FileName = fileName;
 			sfd.Filter = "Text file|*.txt|Text file|*.uut|All files(*.*)|*.*";
 			DialogResult dr = sfd.ShowDialog();
 			if(dr == DialogResult.OK){
-				curEdit.Save(sfd.FileName);
+				SaveEditor(curEdit, sfd.FileName);
 				UpdateIzlar(sfd.FileName);
 				//TabControl1SelectedIndexChanged(null,null);
 				return sfd.FileName;
@@ -2122,7 +2145,7 @@ namespace UyghurEditPP
 				}
 				if(dr == DialogResult.Yes){
 					if(File.Exists(filenm)){
-						curEdit.Save(pg.Tag.ToString());
+						SaveEditor(curEdit, pg.Tag.ToString());
 					}
 					else if(SaveAs(curEdit) == null){
 						return DialogResult.Cancel;   // the Save As box was cancelled: the text is not saved, keep the tab
@@ -2132,6 +2155,7 @@ namespace UyghurEditPP
 			gIzOffset[filenm] = curEdit.CaretOffset;
 			mainTab.TabPages.RemoveAt(tabIndex);
 			ForgetRecovery(curEdit);
+			gTooLongReported.Remove(curEdit);
 			// The descriptor holds the editor; release it so the closed tab can be collected.
 			System.ComponentModel.DependencyPropertyDescriptor.FromProperty(TextEditor.IsModifiedProperty, typeof(TextEditor)).RemoveValueChanged(curEdit, TextOzgerdi);
 			curEdit.Clear();
@@ -2562,6 +2586,7 @@ namespace UyghurEditPP
 					gEditor.Encoding = System.Text.Encoding.GetEncoding(codePage);
 					gEditor.CodePage = codePage;
 					TabControl1SelectedIndexChanged(null,null);
+					SaveRecoveryCopy(mainTab.SelectedTab);   // the copy notes the new encoding
 				}
 				return;
 			}
@@ -2596,6 +2621,7 @@ namespace UyghurEditPP
 						break;
 				}
 				gEditor.CodePage = codePage;
+				gEditor.RememberFile(filenm);
 			}
 			else{
 				gEditor.Encoding = System.Text.Encoding.GetEncoding(codePage);

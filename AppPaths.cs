@@ -30,9 +30,15 @@ namespace UyghurEditPP
 		/// </summary>
 		public static string DataFolder{
 			get{
+				if(DataFolderOverride != null){
+					return DataFolderOverride;
+				}
 				return ChooseDataFolder(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ProgramFolder, IsPackaged, Path.GetTempPath());
 			}
 		}
+
+		// Seam for the tests: a temporary folder in place of the user's own.
+		internal static string DataFolderOverride;
 
 		/// <summary>
 		/// Picks the data folder: %AppData%\UyghurEditPP when there is a profile folder.
