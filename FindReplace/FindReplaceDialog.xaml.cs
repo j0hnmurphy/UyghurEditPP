@@ -327,23 +327,33 @@ namespace UyghurEditPP.FindReplace
 			if (CenteredMessageBox.ShowHere(findWindow ?? CenteredMessageBox.MainWindow, msg, MainForm.gLang.GetText("Hemmini Almashturush"),
 				System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.Yes)
 			{
-				Cursor old = Mouse.OverrideCursor;
-				Mouse.OverrideCursor= Cursors.Wait;
-				try{
-					Guard(() => {
-						Regex regex = GetRegEx(txtFind.Text, true);
-						string repText = ReplacementText();
-						TextEditor current = Editor;
-						foreach(TextEditor ed in EditorsToSearch()){
-							ReplaceAllIn(ed, regex, repText, ed == current);
-						}
-					});
-				}
-				finally{
-					// Also after a time-out: what was replaced so far is reported.
-					labKun.Text = MainForm.gLang.GetText("Jemiy ") + repCount + MainForm.gLang.GetText(" qétim almashturuldi");
-					Mouse.OverrideCursor = old;
-				}
+				ReplaceAll();
+			}
+		}
+
+		// The replacing of "replace all", once confirmed.
+		internal void ReplaceAll()
+		{
+			Cursor old = Mouse.OverrideCursor;
+			Mouse.OverrideCursor= Cursors.Wait;
+			int before = repCount;
+			bool done = false;
+			try{
+				done = Guard(() => {
+					Regex regex = GetRegEx(txtFind.Text, true);
+					string repText = ReplacementText();
+					TextEditor current = Editor;
+					foreach(TextEditor ed in EditorsToSearch()){
+						ReplaceAllIn(ed, regex, repText, ed == current);
+					}
+				});
+			}
+			finally{
+				string count = MainForm.gLang.GetText("Jemiy ") + repCount + MainForm.gLang.GetText(" qétim almashturuldi");
+				// When it stopped (bad pattern, time-out), Guard's message stays; what was replaced
+				// before a time-out is added to it.
+				labKun.Text = done ? count : repCount > before ? labKun.Text + " " + count : labKun.Text;
+				Mouse.OverrideCursor = old;
 			}
 		}
 
