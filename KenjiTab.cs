@@ -19,8 +19,62 @@ namespace UyghurEditPP
 		
 		private int CloseButtonHeight
 		{
-			// 14 pixels at 100%, scaled to the monitor's DPI.
-			get{ return LogicalToDeviceUnits(14); }
+			// 14 pixels at 100%.
+			get{ return Px(14); }
+		}
+
+		// TabControl scales neither ItemSize nor Padding, at startup or on a DPI change. Scale them
+		// from the values at 100% (the designer's) by the total factor Windows Forms has applied to
+		// the layout, so changes back and forth do not add up rounding errors, and the tabs and
+		// what is drawn on them (Px) always use the same factor as the rest of the window, also
+		// when it differs from DeviceDpi (a window created on a monitor whose DPI is not the
+		// system DPI is not rescaled by .NET Framework). Padding stays at 100% and is scaled in
+		// WndProc: setting it recreates the handle, and with it the editors in the tabs.
+		private Size _logicalItemSize;
+		private Size _appliedItemSize;
+		private SizeF _scale = new SizeF(1f, 1f);
+
+		protected override void ScaleControl(SizeF factor, BoundsSpecified specified)
+		{
+			base.ScaleControl(factor, specified);
+			// Windows Forms may call this twice for one scaling, with the factors for different
+			// bounds (Control.ScaleControl(SizeF, SizeF, Control)); apply each factor only to the
+			// dimensions it is for.
+			bool width = (specified & BoundsSpecified.Width) != 0;
+			bool height = (specified & BoundsSpecified.Height) != 0;
+			if (!width && !height)
+				return;
+			if (ItemSize != _appliedItemSize)
+				// Set from outside (the designer, before any scaling): take it as the size now.
+				_logicalItemSize = new Size(Unscaled(ItemSize.Width, _scale.Width), Unscaled(ItemSize.Height, _scale.Height));
+			_scale = new SizeF(width ? _scale.Width * factor.Width : _scale.Width, height ? _scale.Height * factor.Height : _scale.Height);
+			if (IsHandleCreated)
+				SendMessage(Handle, TCM_SETPADDING, IntPtr.Zero, MAKELPARAM(Padding.X, Padding.Y));
+			// Also makes the tabs measure themselves again with the new padding.
+			ItemSize = new Size(Scaled(_logicalItemSize.Width, _scale.Width), Scaled(_logicalItemSize.Height, _scale.Height));
+			_appliedItemSize = ItemSize;
+		}
+
+		/// <summary>The padding of the tabs in pixels (Padding is at 100%).</summary>
+		internal Point ScaledPadding
+		{
+			get{ return new Point(Scaled(Padding.X, _scale.Width), Scaled(Padding.Y, _scale.Height)); }
+		}
+
+		/// <summary>Pixels at 100% to pixels now, by the same factor as the tabs.</summary>
+		internal int Px(int logical)
+		{
+			return Scaled(logical, _scale.Height);
+		}
+
+		private static int Scaled(int value, float scale)
+		{
+			return (int)Math.Round(value * (double)scale, MidpointRounding.AwayFromZero);
+		}
+
+		private static int Unscaled(int value, float scale)
+		{
+			return (int)Math.Round(value / (double)scale, MidpointRounding.AwayFromZero);
 		}
 
 		private int HotTabIndex
@@ -97,7 +151,7 @@ namespace UyghurEditPP
 		protected override void WndProc(ref Message m)
 		{
 			if (m.Msg == TCM_SETPADDING)
-				m.LParam = MAKELPARAM(this.Padding.X + CloseButtonHeight / 2, this.Padding.Y);
+				m.LParam = MAKELPARAM(ScaledPadding.X + CloseButtonHeight / 2, ScaledPadding.Y);
 
 			if (m.Msg == WM_MOUSEDOWN && !this.DesignMode && HotTabIndex>=0)
 			{
@@ -142,7 +196,7 @@ namespace UyghurEditPP
 			if (active)
 			{
 				using (SolidBrush accent = new SolidBrush(theme.Accent))
-					graphics.FillRectangle(accent, rc.Left, rc.Top, rc.Width, LogicalToDeviceUnits(3));
+					graphics.FillRectangle(accent, rc.Left, rc.Top, rc.Width, Px(3));
 			}
 		}
 		
@@ -168,7 +222,7 @@ namespace UyghurEditPP
 			Rectangle textrect = contentRect;
 			textrect.Width -= FontHeight;
 			// Keep clear of the frame and the line on top (the text fills its box with the tab color).
-			int edge = LogicalToDeviceUnits(3);
+			int edge = Px(3);
 			textrect.Inflate(-1, -edge);
 
 			if (tabImage != null)
@@ -189,12 +243,12 @@ namespace UyghurEditPP
 					if (selectedOrHot)
 					{
 						Rectangle closeRect = new Rectangle(contentRect.Right - CloseButtonHeight, 0, CloseButtonHeight, CloseButtonHeight);
-						closeRect.Offset(-LogicalToDeviceUnits(2), (contentRect.Height - closeRect.Height) / 2);
+						closeRect.Offset(-Px(2), (contentRect.Height - closeRect.Height) / 2);
 						DrawCloseButton(bmGraphics, closeRect);
 					}
 					if (tabImage != null)
 					{
-						Rectangle imageRect = new Rectangle(Padding.X, 0, tabImage.Width, tabImage.Height);
+						Rectangle imageRect = new Rectangle(ScaledPadding.X, 0, tabImage.Width, tabImage.Height);
 						imageRect.Offset(0, (contentRect.Height - imageRect.Height) / 2);
 						bmGraphics.DrawImage(tabImage, imageRect);
 					}
@@ -208,7 +262,7 @@ namespace UyghurEditPP
 		private void DrawCloseButton(Graphics graphics, Rectangle bounds)
 		{
 			graphics.FillRectangle(Brushes.Red, bounds);
-			using (Font closeFont = new Font("Tahoma", LogicalToDeviceUnits(12), FontStyle.Bold, GraphicsUnit.Pixel)) // 9 pt at 100%
+			using (Font closeFont = new Font("Tahoma", Px(12), FontStyle.Bold, GraphicsUnit.Pixel)) // 9 pt at 100%
 				TextRenderer.DrawText(graphics, "X", closeFont, bounds, Color.White, Color.Red, TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter);
 
 		}

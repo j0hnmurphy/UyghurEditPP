@@ -297,6 +297,9 @@
     <Compile Include="KenjiTab.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="KenjiToolStrip.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Language.cs" />
     <Compile Include="UiDarkStyles.cs" />
     <Compile Include="UiTheme.cs" />
