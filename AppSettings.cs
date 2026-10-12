@@ -105,22 +105,15 @@ namespace UyghurEditPP
 		/// <summary>
 		/// Puts the open files list saved in jsonFile now (by the first window) into config, in
 		/// place of the one read at the start: a later window must not save its stale copy over
-		/// it. A file that cannot be read leaves config as it is (and the file in place). Never throws.
+		/// it. Returns false, leaving config as it is, when the file cannot be read (also after
+		/// trying again for a moment while another window is writing it): the settings must
+		/// then not be saved, so that the list on disk stays. Never throws.
 		/// </summary>
-		public static void TakeOpenFilesFromDisk(string jsonFile, Hashtable config)
+		public static bool TakeOpenFilesFromDisk(string jsonFile, Hashtable config)
 		{
-			Hashtable onDisk;
-			try{
-				using(FileStream fs = File.OpenRead(jsonFile)){
-					onDisk = ToHashtable((Data)new DataContractJsonSerializer(typeof(Data)).ReadObject(fs) ?? new Data());
-				}
-			}
-			catch(Exception ee){
-				if(!(ee is FileNotFoundException || ee is DirectoryNotFoundException)){
-					Log(ee);
-					return;
-				}
-				onDisk = new Hashtable();   // nothing saved yet: there is no list
+			Hashtable onDisk = ReadForMerge(jsonFile);
+			if(onDisk == null){
+				return false;
 			}
 			foreach(string key in new[] { "ACHIQ", "ACHIQ_TALLANGHAN" }){
 				if(onDisk.ContainsKey(key)){
@@ -128,6 +121,35 @@ namespace UyghurEditPP
 				}
 				else{
 					config.Remove(key);
+				}
+			}
+			return true;
+		}
+
+		// How long a file being replaced by another window is waited for.
+		const int ReadTries = 10;
+		const int ReadWaitMs = 100;
+
+		// The settings in jsonFile now; empty when there is no file yet; null when it cannot be read.
+		static Hashtable ReadForMerge(string jsonFile)
+		{
+			for(int i = 1; ; i++){
+				try{
+					using(FileStream fs = File.OpenRead(jsonFile)){
+						return ToHashtable((Data)new DataContractJsonSerializer(typeof(Data)).ReadObject(fs) ?? new Data());
+					}
+				}
+				catch(Exception ee){
+					if(ee is FileNotFoundException || ee is DirectoryNotFoundException){
+						return new Hashtable();   // nothing saved yet
+					}
+					// In use (being replaced): try again for a moment. Anything else fails at once.
+					if((ee is IOException || ee is UnauthorizedAccessException) && i < ReadTries){
+						System.Threading.Thread.Sleep(ReadWaitMs);
+						continue;
+					}
+					Log(ee);
+					return null;
 				}
 			}
 		}

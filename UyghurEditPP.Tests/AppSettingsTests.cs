@@ -339,10 +339,45 @@ namespace UyghurEditPP.Tests
 			File.WriteAllText(gJson, "{ not json");
 			Hashtable second = FullConfig();
 			second["ACHIQ"] = new[] { "a.txt" };
-			AppSettings.TakeOpenFilesFromDisk(gJson, second);
+			// False: the window must not save its settings, so the list on disk stays.
+			Assert.IsFalse(AppSettings.TakeOpenFilesFromDisk(gJson, second));
 			CollectionAssert.AreEqual(new[] { "a.txt" }, (string[])second["ACHIQ"]);
 			Assert.IsTrue(File.Exists(gJson));   // not renamed to .bad-*: that is Load's job
 			Assert.AreEqual(1, gLogged.Count);
+		}
+
+		// Re-review: while the first window replaces the file, it cannot be read for a moment;
+		// the stale list was then kept and saved over the first window's.
+		[TestMethod]
+		public void TakeOpenFilesFromDisk_FileBriefly_Locked_TriesAgain()
+		{
+			Hashtable first = FullConfig();
+			first["ACHIQ"] = new[] { "new.txt" };
+			AppSettings.Save(gJson, first);
+			Hashtable second = FullConfig();
+			second["ACHIQ"] = new[] { "stale.txt" };
+			FileStream locked = new FileStream(gJson, FileMode.Open, FileAccess.Read, FileShare.None);
+			System.Threading.Timer release = new System.Threading.Timer(s => locked.Dispose(), null, 300, System.Threading.Timeout.Infinite);
+			try{
+				Assert.IsTrue(AppSettings.TakeOpenFilesFromDisk(gJson, second));
+			}
+			finally{
+				release.Dispose();
+				locked.Dispose();
+			}
+			CollectionAssert.AreEqual(new[] { "new.txt" }, (string[])second["ACHIQ"]);
+		}
+
+		[TestMethod]
+		public void TakeOpenFilesFromDisk_FileStaysLocked_SaysSo_AndKeepsTheTable()
+		{
+			AppSettings.Save(gJson, FullConfig());
+			Hashtable second = FullConfig();
+			second["ACHIQ"] = new[] { "stale.txt" };
+			using(new FileStream(gJson, FileMode.Open, FileAccess.Read, FileShare.None)){
+				Assert.IsFalse(AppSettings.TakeOpenFilesFromDisk(gJson, second));
+			}
+			CollectionAssert.AreEqual(new[] { "stale.txt" }, (string[])second["ACHIQ"]);
 		}
 
 		[TestMethod]

@@ -1925,9 +1925,11 @@ namespace UyghurEditPP
 					gConfig.Remove("ACHIQ_TALLANGHAN");
 				}
 			}
-			else if(gKeepOpenFiles){
+			// False when the settings must not be saved (the first window's list could not be read).
+			bool saveSettings = true;
+			if(gKeepOpenFiles){
 				// The list read at the start may be out of date: the first window may have saved since.
-				AppSettings.TakeOpenFilesFromDisk(AppPaths.DataFile(AppSettings.FileName), gConfig);
+				saveSettings = AppSettings.TakeOpenFilesFromDisk(AppPaths.DataFile(AppSettings.FileName), gConfig);
 			}
 			gConfig["IZLAR"]   = gIzlar.ToArray();
 			gConfig["ORUNLAR"] = gIzOffset;
@@ -1935,7 +1937,9 @@ namespace UyghurEditPP
 			{
 				gConfig["CHONGLUQI"] = new Rectangle(this.Location, WindowSize.ToLogical(this.Size, DeviceDpi));
 				System.Diagnostics.Debug.WriteLine(gConfig["CHONGLUQI"]);
-				AppSettings.Save(AppPaths.DataFile(AppSettings.FileName), gConfig);
+				if(saveSettings){
+					AppSettings.Save(AppPaths.DataFile(AppSettings.FileName), gConfig);
+				}
 			}
 			catch(Exception er)
 			{
