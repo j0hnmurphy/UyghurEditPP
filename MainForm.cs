@@ -925,6 +925,7 @@ namespace UyghurEditPP
 			this.Size = WindowSize.ToDevice(rc.Size, WindowSize.DpiAt(this.Location, DeviceDpi));
 			MenuYengiClick(null,null);
 			RestoreOpenFiles();
+			StartRecovery();
 		}
 
 		
@@ -989,6 +990,233 @@ namespace UyghurEditPP
 			}
 			return files.ToArray();
 		}
+
+		#region Recovery of unsaved documents
+		// Copies of the modified documents are kept while the program runs (see Recovery), and
+		// are offered again at the next start if the program did not exit normally.
+		Recovery gRecovery;   // null when it cannot be used, or once the program is closing
+		long     gRecoveryStarted;   // when this program started (UTC ticks), as in its index file name
+		Timer    gAutosaveTimer;
+
+		// The copy kept for an editor, and what it was made from.
+		readonly Dictionary<TextEditor, Recovery.Written> gRecoveryTabs = new Dictionary<TextEditor, Recovery.Written>();
+		// Editors too long to copy that were noted in the error log already (once each).
+		readonly HashSet<TextEditor> gTooLongReported = new HashSet<TextEditor>();
+
+		// Set when a copy could not be made (no permission, disk full, text too long):
+		// the changes are then not copied at once any more, only by the timer.
+		bool gRecoveryBroken;
+
+		static TextEditor EditorOf(TabPage pg)
+		{
+			return (TextEditor)((ElementHost)pg.Controls[0]).Child;
+		}
+
+		TabPage TabOf(TextEditor ed)
+		{
+			foreach(TabPage pg in mainTab.TabPages){
+				if(pg.Controls.Count > 0 && EditorOf(pg) == ed){
+					return pg;
+				}
+			}
+			return null;
+		}
+
+		void StartRecovery()
+		{
+			try{
+				System.Diagnostics.Process me = System.Diagnostics.Process.GetCurrentProcess();
+				gRecoveryStarted = me.StartTime.ToUniversalTime().Ticks;
+				gRecovery = new Recovery(Recovery.DefaultFolder, me.Id, new DateTime(gRecoveryStarted, DateTimeKind.Utc));
+			}
+			catch(Exception ee){
+				ErrorLog.Write(ee);
+				return;
+			}
+			int minutes = Recovery.Minutes(gConfig["AVTOSAQLASH"]);
+			if(minutes > 0){
+				gAutosaveTimer = new Timer();
+				gAutosaveTimer.Interval = minutes * 60 * 1000;
+				gAutosaveTimer.Tick += (s, a) => SaveRecoveryCopies();
+				gAutosaveTimer.Start();
+			}
+			// After the window is shown, and after the files given on the command line are opened.
+			BeginInvoke(new Action(OfferRecovery));
+		}
+
+		void SaveRecoveryCopies()
+		{
+			foreach(TabPage pg in mainTab.TabPages){
+				SaveRecoveryCopy(pg);
+			}
+		}
+
+		// Writes the copy of the tab if its text changed since the last one, and removes the
+		// copy of a tab that is not modified. Returns false if the copy could not be kept.
+		// Never throws: a copy that fails must not disturb the editing.
+		bool SaveRecoveryCopy(TabPage pg)
+		{
+			if(gRecovery == null){
+				return false;
+			}
+			try{
+				TextEditor ed = EditorOf(pg);
+				Recovery.Written state;
+				gRecoveryTabs.TryGetValue(ed, out state);
+				if(!ed.IsModified){
+					ForgetRecovery(ed);
+					return true;
+				}
+				string title = pg.Text.StartsWith("*") ? pg.Text.Substring(1) : pg.Text;
+				ITextSource snapshot = ed.Document.CreateSnapshot();
+				if(snapshot.TextLength > Recovery.MaxChars){
+					if(gTooLongReported.Add(ed)){
+						Recovery.ReportTooLong(title, snapshot.TextLength);
+					}
+					gRecoveryBroken = true;
+					return false;
+				}
+				string path = pg.Tag as string;
+				if(string.IsNullOrEmpty(path)){
+					path = null;
+				}
+				bool bom = ed.Encoding != null && ed.Encoding.GetPreamble().Length > 0;
+				// The file as loaded or saved last: whether it changed since is judged by this at the restore.
+				long fileTime = path != null ? ed.FileTime : 0, fileLength = path != null ? ed.FileLength : 0;
+				if(state != null && state.Same(snapshot.Version, ed.CodePage, bom, fileTime, fileLength)){
+					return true;
+				}
+				if(path == null && snapshot.TextLength == 0){
+					ForgetRecovery(ed);   // nothing worth keeping in a new document
+					return true;
+				}
+				string id = state != null ? state.Id : Recovery.NewId();
+				if(!gRecovery.Save(id, path, title, ed.CodePage, bom, snapshot.Text, fileTime, fileLength)){
+					gRecoveryBroken = true;
+					return false;
+				}
+				gRecoveryTabs[ed] = new Recovery.Written{Id = id, Version = snapshot.Version, CodePage = ed.CodePage, Bom = bom, FileTime = fileTime, FileLength = fileLength};
+				gRecoveryBroken = false;
+				return true;
+			}
+			catch(Exception ee){
+				gRecoveryBroken = true;
+				ErrorLog.Write(ee);
+				return false;
+			}
+		}
+
+		// The editor was saved, or its tab closed: its copy is not needed any more.
+		void ForgetRecovery(TextEditor ed)
+		{
+			Recovery.Written state;
+			if(gRecovery == null || !gRecoveryTabs.TryGetValue(ed, out state)){
+				return;
+			}
+			gRecoveryTabs.Remove(ed);
+			try{
+				gRecovery.Remove(state.Id);
+			}
+			catch(Exception ee){
+				ErrorLog.Write(ee);
+			}
+		}
+
+		// The program is closing: nothing is left to recover.
+		void EndRecovery()
+		{
+			if(gAutosaveTimer != null){
+				gAutosaveTimer.Stop();
+			}
+			if(gRecovery != null){
+				gRecovery.Clear();
+				gRecovery = null;
+			}
+		}
+
+		void OfferRecovery()
+		{
+			if(gRecovery == null || IsDisposed){
+				return;
+			}
+			// Files whose recovered text went to a new tab because they changed after it was copied.
+			List<string> changedFiles = new List<string>();
+			try{
+				// Old files are deleted only after the question is answered (Recovery.Offer).
+				Recovery.Offer(Recovery.DefaultFolder, System.Diagnostics.Process.GetCurrentProcess().Id, gRecoveryStarted, Recovery.IsRunning,
+					DateTime.UtcNow.AddDays(-Recovery.KeepDays),
+					() => {
+						DialogResult dr = CenteredMessageBox.Show(this, gLang.GetText("The program did not close normally last time. Restore the unsaved documents?"), "UyghurEdit++ v" + GetVersion(), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+						return dr == DialogResult.Yes ? true : dr == DialogResult.No ? false : (bool?)null;
+					},
+					left => RestoreLeftover(left, changedFiles));
+			}
+			catch(Exception ee){
+				ErrorLog.Write(ee);
+			}
+			if(changedFiles.Count > 0){
+				CenteredMessageBox.Show(this, gLang.GetText("These files were changed or removed after the copies were made. The recovered text is in new tabs; the files were not changed:") + "\n\n" + string.Join("\n", changedFiles), "UyghurEdit++ v" + GetVersion(), MessageBoxButtons.OK, MessageBoxIcon.Information);
+			}
+		}
+
+		bool RestoreLeftover(Recovery.Leftover left, List<string> changedFiles)
+		{
+			bool all = true;
+			foreach(Recovery.LeftoverCopy item in left.Items){
+				try{
+					all &= RestoreCopy(item, changedFiles);
+				}
+				catch(Exception ee){
+					ErrorLog.Write(ee);
+					all = false;
+				}
+			}
+			return all;
+		}
+
+		bool RestoreCopy(Recovery.LeftoverCopy item, List<string> changedFiles)
+		{
+			string text = item.ReadText();
+			string path = item.Path;
+			// The copy goes back into the file's own tab only if the file is still as it was when
+			// the document was loaded or saved; otherwise saving would overwrite the newer file.
+			bool ownTab = item.FileUnchanged() && !IsImageFile(path);
+			if(!ownTab && !string.IsNullOrEmpty(path)){
+				changedFiles.Add(path);
+			}
+			if(ownTab){
+				OpenaFile(path);
+				if(gEditor.IsModified){
+					ownTab = false;   // that tab already has edits of its own
+				}
+			}
+			if(!ownTab){
+				string name = !string.IsNullOrEmpty(path) ? gLang.GetText("Recovered") + " " + Path.GetFileName(path) : item.Title;
+				AddNew(string.IsNullOrEmpty(name) || IsUntitledName(name) ? NewUntitledName() : FreeTabName(name));
+			}
+			TextEditor ed = gEditor;
+			ed.Text = text;
+			ed.IsModified = true;
+			int codePage = item.CodePage;
+			if(codePage > 0 && codePage != ed.CodePage){
+				try{
+					// UTF-8 and UTF-16 keep the byte order mark the file had.
+					ed.Encoding = codePage == 65001 ? new UTF8Encoding(item.Bom)
+						: (codePage == 1200 || codePage == 1201) ? new UnicodeEncoding(codePage == 1201, item.Bom)
+						: Encoding.GetEncoding(codePage);
+					ed.CodePage = codePage;
+				}
+				catch(ArgumentException ee){
+					ErrorLog.Write(ee);   // this system does not have that code page: it saves as before
+				}
+			}
+			else if(codePage < 0){
+				ed.CodePage = codePage;   // an old Uyghur code: shown as before, saved as UTF-8
+			}
+			UpdateToolbar();
+			return SaveRecoveryCopy(mainTab.SelectedTab);
+		}
+		#endregion
 
 		Font gMenuFont;
 
@@ -1288,8 +1516,43 @@ namespace UyghurEditPP
 		
 		void MenuYengiClick(object sender, EventArgs e)
 		{
-			AddNew(String.Format("Namsiz_{0}.txt",gFileNum));
-			gFileNum++;
+			AddNew(NewUntitledName());
+		}
+
+		bool TabNameTaken(string name)
+		{
+			foreach(TabPage pg in mainTab.TabPages){
+				if(string.Equals(pg.Text.TrimStart('*'), name, StringComparison.OrdinalIgnoreCase)){
+					return true;
+				}
+			}
+			return false;
+		}
+
+		static bool IsUntitledName(string name)
+		{
+			return Regex.IsMatch(name, @"^Namsiz_\d+\.txt$", RegexOptions.IgnoreCase);
+		}
+
+		// The next Namsiz_<n>.txt that no tab has (restored tabs keep such names too).
+		string NewUntitledName()
+		{
+			string name;
+			do{
+				name = String.Format("Namsiz_{0}.txt", gFileNum++);
+			}while(TabNameTaken(name));
+			return name;
+		}
+
+		// name, or "name (2).txt", "name (3).txt" ... when a tab already has it.
+		string FreeTabName(string name)
+		{
+			string stem = Path.GetFileNameWithoutExtension(name), ext = Path.GetExtension(name);
+			string free = name;
+			for(int i = 2; TabNameTaken(free); i++){
+				free = stem + " (" + i + ")" + ext;
+			}
+			return free;
 		}
 		
 		// Brings the toolbar, the tab title and the status bar up to date with the current
@@ -1484,6 +1747,20 @@ namespace UyghurEditPP
 		}
 		
 		void TextOzgerdi(object sender, EventArgs e){
+			TextEditor changed = sender as TextEditor;
+			if(changed != null && gRecovery != null){
+				if(!changed.IsModified){
+					ForgetRecovery(changed);   // saved, or undone back to the saved text
+				}
+				else if(!gRecoveryBroken && !gRecoveryTabs.ContainsKey(changed)){
+					// The first change of a document, or the save failed after all: the copy is made
+					// at once, the timer then keeps it up to date.
+					TabPage pg = TabOf(changed);
+					if(pg != null){
+						SaveRecoveryCopy(pg);
+					}
+				}
+			}
 			UpdateToolbar();
 		}
 		void UndoStackOzgerdi(object sender, System.ComponentModel.PropertyChangedEventArgs e){
@@ -1560,7 +1837,7 @@ namespace UyghurEditPP
 		void MenuSaqlaClick(object sender, EventArgs e)
 		{
 			if(File.Exists(mainTab.SelectedTab.Tag.ToString())){
-				gEditor.Save(mainTab.SelectedTab.Tag.ToString());
+				SaveEditor(gEditor, mainTab.SelectedTab.Tag.ToString());
 				if(mainTab.SelectedTab.Text.StartsWith("*")){
 					mainTab.SelectedTab.Text= mainTab.SelectedTab.Text.Substring(1);
 				}
@@ -1583,13 +1860,29 @@ namespace UyghurEditPP
 			UpdateToolbar();
 		}
 		
+		// Saves the editor to the file. Its recovery copy is deleted only once the file is written
+		// (TextEditor.Save); when saving fails, the copy is brought up to date at once.
+		void SaveEditor(TextEditor ed, string fileName)
+		{
+			try{
+				ed.Save(fileName);
+			}
+			catch{
+				TabPage pg = TabOf(ed);
+				if(pg != null){
+					SaveRecoveryCopy(pg);
+				}
+				throw;
+			}
+		}
+
 		string SaveAs(TextEditor curEdit, string fileName = null){
 			SaveFileDialog sfd = new SaveFileDialog();
 			sfd.FileName = fileName;
 			sfd.Filter = "Text file|*.txt|Text file|*.uut|All files(*.*)|*.*";
 			DialogResult dr = sfd.ShowDialog();
 			if(dr == DialogResult.OK){
-				curEdit.Save(sfd.FileName);
+				SaveEditor(curEdit, sfd.FileName);
 				UpdateIzlar(sfd.FileName);
 				//TabControl1SelectedIndexChanged(null,null);
 				return sfd.FileName;
@@ -1887,15 +2180,17 @@ namespace UyghurEditPP
 				}
 				if(dr == DialogResult.Yes){
 					if(File.Exists(filenm)){
-						curEdit.Save(pg.Tag.ToString());
+						SaveEditor(curEdit, pg.Tag.ToString());
 					}
-					else{
-						SaveAs(curEdit);
+					else if(SaveAs(curEdit) == null){
+						return DialogResult.Cancel;   // the Save As box was cancelled: the text is not saved, keep the tab
 					}
 				}
 			}
 			gIzOffset[filenm] = curEdit.CaretOffset;
 			mainTab.TabPages.RemoveAt(tabIndex);
+			ForgetRecovery(curEdit);
+			gTooLongReported.Remove(curEdit);
 			// The descriptor holds the editor; release it so the closed tab can be collected.
 			System.ComponentModel.DependencyPropertyDescriptor.FromProperty(TextEditor.IsModifiedProperty, typeof(TextEditor)).RemoveValueChanged(curEdit, TextOzgerdi);
 			curEdit.Clear();
@@ -1909,12 +2204,26 @@ namespace UyghurEditPP
 			// Taken before the tabs are closed; kept only if the program really closes.
 			string activeFile;
 			string[] openFiles = OpenFilesNow(out activeFile);
-			while(mainTab.TabPages.Count!=0){
-				dr = CloseTab(0);
-				if(dr == DialogResult.Cancel){
-					e.Cancel = true;
-					break;
+			if(gAutosaveTimer != null){
+				gAutosaveTimer.Stop();   // the copies are not written while the tabs are being closed
+			}
+			try{
+				while(mainTab.TabPages.Count!=0){
+					dr = CloseTab(0);
+					if(dr == DialogResult.Cancel){
+						e.Cancel = true;
+						break;
+					}
 				}
+			}
+			finally{
+				// A close that did not complete (cancelled, or an error) goes on making copies.
+				if(gAutosaveTimer != null && (e.Cancel || mainTab.TabPages.Count != 0)){
+					gAutosaveTimer.Start();
+				}
+			}
+			if(!e.Cancel){
+				EndRecovery();
 			}
 			if(!e.Cancel && !gKeepOpenFiles){
 				gConfig["ACHIQ"] = openFiles;
@@ -2312,6 +2621,7 @@ namespace UyghurEditPP
 					gEditor.Encoding = System.Text.Encoding.GetEncoding(codePage);
 					gEditor.CodePage = codePage;
 					TabControl1SelectedIndexChanged(null,null);
+					SaveRecoveryCopy(mainTab.SelectedTab);   // the copy notes the new encoding
 				}
 				return;
 			}
@@ -2346,6 +2656,7 @@ namespace UyghurEditPP
 						break;
 				}
 				gEditor.CodePage = codePage;
+				gEditor.RememberFile(filenm);
 			}
 			else{
 				gEditor.Encoding = System.Text.Encoding.GetEncoding(codePage);

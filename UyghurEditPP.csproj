@@ -315,6 +315,7 @@
     <Compile Include="Ngram\TstTree.cs" />
     <Compile Include="Ngram\UNode.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="Recovery.cs" />
     <Compile Include="SafeFile.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Rendering\BackgroundGeometryBuilder.cs">

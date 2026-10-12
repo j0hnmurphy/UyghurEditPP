@@ -945,7 +945,31 @@ namespace UyghurEditPP
 			if (fileName == null)
 				throw new ArgumentNullException("fileName");
 			using (FileStream fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read)) {
+				// Taken while the file is open for reading, so nobody can write it in between.
+				RememberFile(fileName);
 				Load(fs);
+			}
+		}
+
+		/// <summary>
+		/// The last write time (UTC ticks) and the length of the file as it was last loaded or
+		/// saved; 0 when not known. Used to tell whether another program changed the file since.
+		/// </summary>
+		public long FileTime { get; private set; }
+		public long FileLength { get; private set; }
+
+		/// <summary>Notes the file's time and length now (see <see cref="FileTime"/>).</summary>
+		public void RememberFile(string fileName)
+		{
+			try {
+				FileInfo fi = new FileInfo(fileName);
+				FileTime = fi.LastWriteTimeUtc.Ticks;
+				FileLength = fi.Length;
+			} catch (Exception ee) {
+				// Not known: a recovered copy then goes to a new tab, never over the file.
+				System.Diagnostics.Debug.WriteLine(ee);
+				FileTime = 0;
+				FileLength = 0;
 			}
 		}
 
@@ -976,6 +1000,12 @@ namespace UyghurEditPP
 		/// </remarks>
 		public void Save(Stream stream)
 		{
+			WriteTo(stream);
+			SetCurrentValue(IsModifiedProperty, Boxes.False);
+		}
+
+		void WriteTo(Stream stream)
+		{
 			if (stream == null)
 				throw new ArgumentNullException("stream");
 			
@@ -991,29 +1021,30 @@ namespace UyghurEditPP
 				document.WriteTextTo(writer);
 			writer.Flush();
 			// do not close the stream
-			SetCurrentValue(IsModifiedProperty, Boxes.False);
 		}
 
 		/// <summary>
-		/// Saves the text to the file.
+		/// Saves the text to the file. <see cref="IsModified"/> turns false only once the file
+		/// is completely written (the recovery copy is deleted then), and stays as it is when
+		/// saving fails.
 		/// </summary>
 		public void Save(string fileName)
 		{
 			if (fileName == null)
 				throw new ArgumentNullException("fileName");
 			// Write to a temporary file first, so that a failed save cannot destroy the existing file.
-			// Save(Stream) may switch Encoding and CodePage to UTF-8; undo that too if saving fails.
-			bool modified = this.IsModified;
+			// WriteTo may switch Encoding and CodePage to UTF-8; undo that too if saving fails.
 			Encoding encoding = this.Encoding;
 			int codePage = CodePage;
 			try {
-				SafeFile.Write(fileName, Save);
+				SafeFile.Write(fileName, WriteTo);
 			} catch {
-				SetCurrentValue(IsModifiedProperty, Boxes.Box(modified));
 				SetCurrentValue(EncodingProperty, encoding);
 				CodePage = codePage;
 				throw;
 			}
+			RememberFile(fileName);
+			SetCurrentValue(IsModifiedProperty, Boxes.False);
 		}
 		#endregion
 

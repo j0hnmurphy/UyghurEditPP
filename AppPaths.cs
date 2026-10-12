@@ -30,9 +30,25 @@ namespace UyghurEditPP
 		/// </summary>
 		public static string DataFolder{
 			get{
+				if(DataFolderOverride != null){
+					return DataFolderOverride;
+				}
+				string fromEnvironment = Environment.GetEnvironmentVariable(DataFolderVariable);
+				if(!string.IsNullOrEmpty(fromEnvironment)){
+					return fromEnvironment;
+				}
 				return ChooseDataFolder(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ProgramFolder, IsPackaged, Path.GetTempPath());
 			}
 		}
+
+		// Seam for the tests: a temporary folder in place of the user's own.
+		internal static string DataFolderOverride;
+
+		/// <summary>
+		/// For testing by hand: when this environment variable is set, the program keeps its
+		/// settings, recovery copies and logs in that folder instead of %AppData%\UyghurEditPP.
+		/// </summary>
+		public const string DataFolderVariable = "UYGHUREDITPP_DATA_FOLDER";
 
 		/// <summary>
 		/// Picks the data folder: %AppData%\UyghurEditPP when there is a profile folder.

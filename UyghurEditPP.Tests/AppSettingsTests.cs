@@ -55,6 +55,7 @@ namespace UyghurEditPP.Tests
 			h["ORUNLAR"] = new Dictionary<string, int> { { @"C:\Hojjetler\a.txt", 42 }, { @"D:\ئۇيغۇرچە\b.txt", 7 } };
 			h["ACHIQ"] = new[] { @"D:\ئۇيغۇرچە\b.txt", @"C:\Hojjetler\a.txt" };
 			h["ACHIQ_TALLANGHAN"] = @"C:\Hojjetler\a.txt";
+			h["AVTOSAQLASH"] = 5;
 			return h;
 		}
 
@@ -378,6 +379,43 @@ namespace UyghurEditPP.Tests
 				Assert.IsFalse(AppSettings.TakeOpenFilesFromDisk(gJson, second));
 			}
 			CollectionAssert.AreEqual(new[] { "stale.txt" }, (string[])second["ACHIQ"]);
+		}
+
+		[TestMethod]
+		public void Load_AutosaveMinutes_WholeNumbersWork()
+		{
+			File.WriteAllText(gJson, "{\"autosaveMinutes\": 0}");
+			Assert.AreEqual(0, AppSettings.Load(gJson, gCfg)["AVTOSAQLASH"]);
+
+			File.WriteAllText(gJson, "{\"autosaveMinutes\": 10, \"language\": \"uey\"}");
+			Hashtable loaded = AppSettings.Load(gJson, gCfg);
+			Assert.AreEqual(10, loaded["AVTOSAQLASH"]);
+			Assert.AreEqual("uey", loaded["LANG"]);
+		}
+
+		[TestMethod]
+		public void Load_AutosaveMinutes_NotAWholeNumber_KeepsTheFileAsBad()
+		{
+			// Written by hand with the wrong type: like any unreadable settings file it is set
+			// aside (not overwritten) and the defaults are used.
+			File.WriteAllText(gJson, "{\"language\": \"uey\", \"autosaveMinutes\": \"abc\"}");
+
+			Hashtable loaded = AppSettings.Load(gJson, gCfg);
+
+			Assert.AreEqual(0, loaded.Count);
+			Assert.AreEqual(1, Directory.GetFiles(gFolder, "uyghuredit.json.bad-*").Length);
+		}
+
+		[TestMethod]
+		public void Load_AutosaveMinutes_QuotedNumberWorks_FractionIsSetAside()
+		{
+			File.WriteAllText(gJson, "{\"autosaveMinutes\": \"5\"}");
+			Assert.AreEqual(5, AppSettings.Load(gJson, gCfg)["AVTOSAQLASH"]);
+
+			File.WriteAllText(gJson, "{\"autosaveMinutes\": 2.5}");
+			Hashtable loaded = AppSettings.Load(gJson, gCfg);
+			Assert.AreEqual(0, loaded.Count);
+			Assert.AreEqual(1, Directory.GetFiles(gFolder, "uyghuredit.json.bad-*").Length);
 		}
 
 		[TestMethod]

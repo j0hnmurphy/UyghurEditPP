@@ -573,5 +573,20 @@
     "uly": "Qayta sina",
     "jpn": "再試行(&R)",
     "eng": "&Retry"
+  },
+  "The program did not close normally last time. Restore the unsaved documents?": {
+    "uly": "Program aldinqi qétim normal taqalmidi. Saqlanmighan höjjetlerni eslige keltüremsiz?",
+    "jpn": "前回は正常に終了しませんでした。保存していなかった文書を復元しますか?",
+    "eng": "The program did not close normally last time. Restore the unsaved documents?"
+  },
+  "Recovered": {
+    "uly": "Eslige keltürüldi",
+    "jpn": "復元",
+    "eng": "Recovered"
+  },
+  "These files were changed or removed after the copies were made. The recovered text is in new tabs; the files were not changed:": {
+    "uly": "Töwendiki höjjetler köchürmisi élin'ghandin kéyin özgertilgen yaki öchürülgen. Eslige keltürülgen tékist yéngi betlerde, höjjetler özgertilmidi:",
+    "jpn": "次のファイルは写しを作った後に変更または削除されていました。復元した本文は新しいタブに開き、ファイルは変更していません:",
+    "eng": "These files were changed or removed after the copies were made. The recovered text is in new tabs; the files were not changed:"
   }
 }
