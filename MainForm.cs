@@ -712,7 +712,7 @@ namespace UyghurEditPP
 		
 		const int MaxRecentFiles = 15;
 		// The files this window opened, saved, closed or dropped: their place in the recent files and their
-		// caret positions are this window's when a later window merges its lists (see FormClosing).
+		// caret positions are this window's when it merges its lists with those on disk at closing (see FormClosing).
 		readonly HashSet<string> gUsedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
 		void UpdateIzlar(string fileName = null)
