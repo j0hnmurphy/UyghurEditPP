@@ -588,5 +588,25 @@
     "uly": "Töwendiki höjjetler köchürmisi élin'ghandin kéyin özgertilgen yaki öchürülgen. Eslige keltürülgen tékist yéngi betlerde, höjjetler özgertilmidi:",
     "jpn": "次のファイルは写しを作った後に変更または削除されていました。復元した本文は新しいタブに開き、ファイルは変更していません:",
     "eng": "These files were changed or removed after the copies were made. The recovered text is in new tabs; the files were not changed:"
+  },
+  "Search in all open tabs": {
+    "uly": "Échilghan barliq betlerde izde",
+    "jpn": "開いているすべてのタブを検索",
+    "eng": "Search in all open tabs"
+  },
+  "The regular expression is not valid.": {
+    "uly": "Muntizim ipade toghra emes.",
+    "jpn": "正規表現が正しくありません",
+    "eng": "The regular expression is not valid."
+  },
+  "The search took too long and was stopped.": {
+    "uly": "Izdesh bek uzun waqit aldi, toxtitildi.",
+    "jpn": "検索に時間がかかりすぎたため中止しました",
+    "eng": "The search took too long and was stopped."
+  },
+  "All open tabs will be changed.": {
+    "uly": "Échilghan barliq betler özgertilidu.",
+    "jpn": "開いているすべてのタブが変更されます。",
+    "eng": "All open tabs will be changed."
   }
 }
