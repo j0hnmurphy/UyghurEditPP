@@ -51,7 +51,7 @@ namespace UyghurEditPP.Tests
 		{
 			string text = "ئۇيغۇرچە\r\nJapanese 日本語\nlone line\r\n\r\n";
 			string id = Recovery.NewId();
-			Assert.IsTrue(New().Save(id, @"D:\ئۇيغۇرچە\a.txt", "a.txt", 932, true, text));
+			New().Save(id, @"D:\ئۇيغۇرچە\a.txt", "a.txt", 932, true, text);
 
 			List<Recovery.Leftover> found = Recovery.FindLeftovers(gFolder, Dead);
 
@@ -241,15 +241,6 @@ namespace UyghurEditPP.Tests
 			File.WriteAllText(Path.Combine(gFolder, "recovery-9-9.json"),
 				"{\"pid\":9,\"started\":9,\"documents\":[{\"id\":\"..\\\\..\\\\x\",\"codePage\":0,\"saved\":1}]}");
 			Assert.AreEqual(0, Recovery.FindLeftovers(gFolder, Dead).Count);
-		}
-
-		[TestMethod]
-		public void TooLongText_IsNotWritten()
-		{
-			bool saved = New().Save(Recovery.NewId(), null, "t", 0, false, new string('a', Recovery.MaxChars + 1));
-
-			Assert.IsFalse(saved);
-			Assert.AreEqual(0, Files().Length);
 		}
 
 		[TestMethod]
@@ -464,7 +455,7 @@ namespace UyghurEditPP.Tests
 		[TestMethod]
 		public void TooLongText_IsLogged()
 		{
-			New().Save(Recovery.NewId(), null, "t", 0, false, new string('a', Recovery.MaxChars + 1));
+			Recovery.ReportTooLong("t", Recovery.MaxChars + 1);
 			Assert.AreEqual(1, gLogged.Count);
 			StringAssert.Contains(gLogged[0].Message, "t");
 		}

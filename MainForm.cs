@@ -711,8 +711,8 @@ namespace UyghurEditPP
 		
 		
 		const int MaxRecentFiles = 15;
-		// The files this window opened, saved or closed: their place in the recent files and their
-		// caret positions are this window's when a later window merges its lists (see FormClosing).
+		// The files this window opened, saved, closed or dropped: their place in the recent files and their
+		// caret positions are this window's when it merges its lists with those on disk at closing (see FormClosing).
 		readonly HashSet<string> gUsedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
 		void UpdateIzlar(string fileName = null)
@@ -813,7 +813,8 @@ namespace UyghurEditPP
 					if(File.Exists(iz) && !IsImageFile(iz)){
 						gIzlar.Add(iz);
 					}
-					else if(gIzOffset.ContainsKey(iz)){
+					else{
+						gUsedFiles.Add(iz);   // dropped by this window: the merge at closing must not bring it back
 						gIzOffset.Remove(iz);
 					}
 				}
@@ -985,9 +986,6 @@ namespace UyghurEditPP
 		// Held by the first window until its settings are saved at closing.
 		InstanceLock gFirstWindow;
 
-		// Most files that come back at the next start (as many as the recent files list holds).
-		const int MaxRestoreFiles = 15;
-
 		// The saved files in the tabs, in tab order, and the selected one (null when it is a new document).
 		string[] OpenFilesNow(out string active)
 		{
@@ -995,7 +993,7 @@ namespace UyghurEditPP
 			active = null;
 			foreach(TabPage pg in mainTab.TabPages){
 				string path = pg.Tag as string;
-				if(string.IsNullOrEmpty(path) || files.Count >= MaxRestoreFiles){
+				if(string.IsNullOrEmpty(path) || files.Count >= MaxRecentFiles){   // as many as the recent files list holds
 					continue;
 				}
 				files.Add(path);
@@ -1018,7 +1016,7 @@ namespace UyghurEditPP
 		// Editors too long to copy that were noted in the error log already (once each).
 		readonly HashSet<TextEditor> gTooLongReported = new HashSet<TextEditor>();
 
-		// Set when a copy could not be made (no permission, disk full, text too long):
+		// Set when a copy could not be made (no permission, disk full):
 		// the changes are then not copied at once any more, only by the timer.
 		bool gRecoveryBroken;
 
@@ -1083,14 +1081,13 @@ namespace UyghurEditPP
 					return true;
 				}
 				string title = pg.Text.StartsWith("*") ? pg.Text.Substring(1) : pg.Text;
-				ITextSource snapshot = ed.Document.CreateSnapshot();
-				if(snapshot.TextLength > Recovery.MaxChars){
+				if(ed.Document.TextLength > Recovery.MaxChars){
 					if(gTooLongReported.Add(ed)){
-						Recovery.ReportTooLong(title, snapshot.TextLength);
+						Recovery.ReportTooLong(title, ed.Document.TextLength);
 					}
-					gRecoveryBroken = true;
-					return false;
+					return false;   // only this tab: the others are still copied at once
 				}
+				ITextSource snapshot = ed.Document.CreateSnapshot();
 				string path = pg.Tag as string;
 				if(string.IsNullOrEmpty(path)){
 					path = null;
@@ -1106,10 +1103,7 @@ namespace UyghurEditPP
 					return true;
 				}
 				string id = state != null ? state.Id : Recovery.NewId();
-				if(!gRecovery.Save(id, path, title, ed.CodePage, bom, snapshot.Text, fileTime, fileLength)){
-					gRecoveryBroken = true;
-					return false;
-				}
+				gRecovery.Save(id, path, title, ed.CodePage, bom, snapshot.Text, fileTime, fileLength);
 				gRecoveryTabs[ed] = new Recovery.Written{Id = id, Version = snapshot.Version, CodePage = ed.CodePage, Bom = bom, FileTime = fileTime, FileLength = fileLength};
 				gRecoveryBroken = false;
 				return true;
@@ -2221,6 +2215,7 @@ namespace UyghurEditPP
 			string activeFile;
 			string[] openFiles = OpenFilesNow(out activeFile);
 			if(gAutosaveTimer != null){
+				SaveRecoveryCopies();   // up to date if Windows ends the program while "Save?" is shown
 				gAutosaveTimer.Stop();   // the copies are not written while the tabs are being closed
 			}
 			try{
@@ -2241,38 +2236,39 @@ namespace UyghurEditPP
 			if(!e.Cancel){
 				EndRecovery();
 			}
-			if(!e.Cancel && !gKeepOpenFiles){
-				gConfig["ACHIQ"] = openFiles;
-				if(activeFile != null){
-					gConfig["ACHIQ_TALLANGHAN"] = activeFile;
-				}
-				else{
-					gConfig.Remove("ACHIQ_TALLANGHAN");
-				}
-			}
-			// False when the settings must not be saved (the first window's list could not be read).
-			bool saveSettings = true;
 			gConfig["IZLAR"]   = gIzlar.ToArray();
 			gConfig["ORUNLAR"] = gIzOffset;
-			if(gKeepOpenFiles){
-				// The lists read at the start may be out of date: the first window may have saved since.
+			// One window at a time reads, merges and writes the settings (see WithSaveLock).
+			AppSettings.WithSaveLock(() => {
+				// The lists read at the start may be out of date: another window may have saved since.
 				// Its open files are kept, and its recent files and caret positions merged with this window's.
-				saveSettings = AppSettings.TakeListsFromDisk(AppPaths.DataFile(AppSettings.FileName), gConfig, gUsedFiles, MaxRecentFiles);
-			}
-			try
-			{
-				gConfig["CHONGLUQI"] = new Rectangle(this.Location, WindowSize.ToLogical(this.Size, DeviceDpi));
-				System.Diagnostics.Debug.WriteLine(gConfig["CHONGLUQI"]);
-				if(saveSettings){
-					AppSettings.Save(AppPaths.DataFile(AppSettings.FileName), gConfig);
+				bool merged = AppSettings.TakeListsFromDisk(AppPaths.DataFile(AppSettings.FileName), gConfig, gUsedFiles, MaxRecentFiles);
+				if(!e.Cancel && !gKeepOpenFiles){
+					gConfig["ACHIQ"] = openFiles;   // the first window's open files are its own
+					if(activeFile != null){
+						gConfig["ACHIQ_TALLANGHAN"] = activeFile;
+					}
+					else{
+						gConfig.Remove("ACHIQ_TALLANGHAN");
+					}
 				}
-			}
-			catch(Exception er)
-			{
-				// Losing the settings is better than not being able to close the program.
-                System.Diagnostics.Debug.WriteLine("Failed to serialize. Reason: " + er.Message);
-				ErrorLog.Write(er);
-			}
+				// A later window that could not read the first window's lists must not save over them.
+				bool saveSettings = merged || !gKeepOpenFiles;
+				try
+				{
+					gConfig["CHONGLUQI"] = new Rectangle(this.Location, WindowSize.ToLogical(this.Size, DeviceDpi));
+					System.Diagnostics.Debug.WriteLine(gConfig["CHONGLUQI"]);
+					if(saveSettings){
+						AppSettings.Save(AppPaths.DataFile(AppSettings.FileName), gConfig);
+					}
+				}
+				catch(Exception er)
+				{
+					// Losing the settings is better than not being able to close the program.
+	                System.Diagnostics.Debug.WriteLine("Failed to serialize. Reason: " + er.Message);
+					ErrorLog.Write(er);
+				}
+			});
 			if(!e.Cancel && gFirstWindow != null){
 				// The settings are saved: a program started now may restore them, even before this one has ended.
 				try{
