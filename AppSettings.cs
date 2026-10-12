@@ -117,6 +117,12 @@ namespace UyghurEditPP
 			if(onDisk == null){
 				return false;
 			}
+			TakeOpenFiles(onDisk, config);
+			return true;
+		}
+
+		static void TakeOpenFiles(Hashtable onDisk, Hashtable config)
+		{
 			foreach(string key in new[] { "ACHIQ", "ACHIQ_TALLANGHAN" }){
 				if(onDisk.ContainsKey(key)){
 					config[key] = onDisk[key];
@@ -125,6 +131,45 @@ namespace UyghurEditPP
 					config.Remove(key);
 				}
 			}
+		}
+
+		/// <summary>
+		/// For a window that is not the first one, before it saves its settings: as
+		/// TakeOpenFilesFromDisk, and the recent files and caret positions are merged with
+		/// those saved in jsonFile now. The files this window used (usedFiles) come first, in
+		/// its order, with its caret positions; the others, and their positions, are taken from
+		/// the file. At most maxRecent recent files. Returns false as TakeOpenFilesFromDisk does.
+		/// (The other settings stay this window's: the last window closed decides them.)
+		/// </summary>
+		public static bool TakeListsFromDisk(string jsonFile, Hashtable config, ICollection<string> usedFiles, int maxRecent)
+		{
+			Hashtable onDisk = ReadForMerge(jsonFile);
+			if(onDisk == null){
+				return false;
+			}
+			TakeOpenFiles(onDisk, config);
+			HashSet<string> used = new HashSet<string>(usedFiles, StringComparer.OrdinalIgnoreCase);
+			List<string> recent = new List<string>();
+			foreach(string f in config["IZLAR"] as string[] ?? new string[0]){
+				if(used.Contains(f)){
+					recent.Add(f);
+				}
+			}
+			foreach(string f in onDisk["IZLAR"] as string[] ?? new string[0]){
+				if(!used.Contains(f)){
+					recent.Add(f);
+				}
+			}
+			config["IZLAR"] = recent.GetRange(0, Math.Min(maxRecent, recent.Count)).ToArray();
+
+			Dictionary<string, int> mine = config["ORUNLAR"] as Dictionary<string, int> ?? new Dictionary<string, int>();
+			Dictionary<string, int> offsets = new Dictionary<string, int>(onDisk["ORUNLAR"] as Dictionary<string, int> ?? new Dictionary<string, int>());
+			foreach(KeyValuePair<string, int> kv in mine){
+				if(used.Contains(kv.Key)){
+					offsets[kv.Key] = kv.Value;
+				}
+			}
+			config["ORUNLAR"] = offsets;
 			return true;
 		}
 

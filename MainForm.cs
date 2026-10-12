@@ -710,6 +710,11 @@ namespace UyghurEditPP
 		}
 		
 		
+		const int MaxRecentFiles = 15;
+		// The files this window opened, saved or closed: their place in the recent files and their
+		// caret positions are this window's when a later window merges its lists (see FormClosing).
+		readonly HashSet<string> gUsedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
 		void UpdateIzlar(string fileName = null)
 		{
 			ToolStripMenuItem iz;
@@ -719,8 +724,9 @@ namespace UyghurEditPP
 			}
 			if(File.Exists(fileName)){
 				gIzlar.Insert(0,fileName);
+				gUsedFiles.Add(fileName);
 			}
-			if(gIzlar.Count>15){
+			if(gIzlar.Count>MaxRecentFiles){
 				gIzlar.RemoveAt(gIzlar.Count-1);
 			}
 			
@@ -2197,6 +2203,7 @@ namespace UyghurEditPP
 				}
 			}
 			gIzOffset[filenm] = curEdit.CaretOffset;
+			gUsedFiles.Add(filenm);
 			mainTab.TabPages.RemoveAt(tabIndex);
 			ForgetRecovery(curEdit);
 			gTooLongReported.Remove(curEdit);
@@ -2245,12 +2252,13 @@ namespace UyghurEditPP
 			}
 			// False when the settings must not be saved (the first window's list could not be read).
 			bool saveSettings = true;
-			if(gKeepOpenFiles){
-				// The list read at the start may be out of date: the first window may have saved since.
-				saveSettings = AppSettings.TakeOpenFilesFromDisk(AppPaths.DataFile(AppSettings.FileName), gConfig);
-			}
 			gConfig["IZLAR"]   = gIzlar.ToArray();
 			gConfig["ORUNLAR"] = gIzOffset;
+			if(gKeepOpenFiles){
+				// The lists read at the start may be out of date: the first window may have saved since.
+				// Its open files are kept, and its recent files and caret positions merged with this window's.
+				saveSettings = AppSettings.TakeListsFromDisk(AppPaths.DataFile(AppSettings.FileName), gConfig, gUsedFiles, MaxRecentFiles);
+			}
 			try
 			{
 				gConfig["CHONGLUQI"] = new Rectangle(this.Location, WindowSize.ToLogical(this.Size, DeviceDpi));

@@ -319,6 +319,42 @@ namespace UyghurEditPP.Tests
 			Assert.AreEqual(30f, saved["FONTSIZE"]);   // its other settings are still saved
 		}
 
+		// Re-review: a second window closing wrote its recent files (read at its start) over
+		// those the first window saved, and erased the first window's caret positions.
+		[TestMethod]
+		public void SecondWindowClosing_MergesTheRecentFilesAndCaretPositions()
+		{
+			Hashtable first = FullConfig();
+			first["IZLAR"] = new[] { @"C:\first-new.txt", @"C:\shared.txt", @"C:\old.txt" };
+			first["ORUNLAR"] = new Dictionary<string, int>{ { @"C:\first-new.txt", 10 }, { @"C:\shared.txt", 20 }, { @"C:\old.txt", 30 } };
+			AppSettings.Save(gJson, first);
+
+			// Read at its start: only old.txt and shared.txt; it then used second.txt and shared.txt.
+			Hashtable second = FullConfig();
+			second["IZLAR"] = new[] { @"C:\second.txt", @"C:\shared.txt", @"C:\old.txt" };
+			second["ORUNLAR"] = new Dictionary<string, int>{ { @"C:\second.txt", 1 }, { @"C:\shared.txt", 2 }, { @"C:\old.txt", 99 } };
+			Assert.IsTrue(AppSettings.TakeListsFromDisk(gJson, second, new[] { @"C:\second.txt", @"c:\SHARED.txt" }, 15));
+
+			CollectionAssert.AreEqual(new[] { @"C:\second.txt", @"C:\shared.txt", @"C:\first-new.txt", @"C:\old.txt" }, (string[])second["IZLAR"]);
+			Dictionary<string, int> offsets = (Dictionary<string, int>)second["ORUNLAR"];
+			Assert.AreEqual(1, offsets[@"C:\second.txt"]);
+			Assert.AreEqual(2, offsets[@"C:\shared.txt"]);     // this window's, it used the file
+			Assert.AreEqual(10, offsets[@"C:\first-new.txt"]); // the first window's, kept
+			Assert.AreEqual(30, offsets[@"C:\old.txt"]);       // not used here: the stale 99 is not saved
+		}
+
+		[TestMethod]
+		public void MergedRecentFiles_AreCut_AtTheLimit()
+		{
+			Hashtable first = FullConfig();
+			first["IZLAR"] = new[] { "a", "b", "c" };
+			AppSettings.Save(gJson, first);
+			Hashtable second = FullConfig();
+			second["IZLAR"] = new[] { "x", "a" };
+			Assert.IsTrue(AppSettings.TakeListsFromDisk(gJson, second, new[] { "x" }, 3));
+			CollectionAssert.AreEqual(new[] { "x", "a", "b" }, (string[])second["IZLAR"]);
+		}
+
 		[TestMethod]
 		public void TakeOpenFilesFromDisk_NoListOnDisk_RemovesTheStaleOne()
 		{
