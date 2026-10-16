@@ -615,12 +615,12 @@
     "eng": "Match other Uyghur scripts too"
   },
   "Word Prediction": {
-    "uly": "",
+    "uly": "Namzat Sözlerni Körset",
     "jpn": "語の予測",
     "eng": "Word Prediction"
   },
   "Shows the words that start with what you are typing": {
-    "uly": "",
+    "uly": "Yéziwatqan sözning namzatlirini körsitidu",
     "jpn": "打っている語で始まる語の候補を出します",
     "eng": "Shows the words that start with what you are typing"
   }
