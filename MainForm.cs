@@ -73,6 +73,7 @@ namespace UyghurEditPP
 		int       gFontStyle  = 0;
 		int       gFontWeight = 0;
 		bool      gYeziqAuto = true;
+		bool      gTahminOchuq = true;   // word prediction; on unless turned off (owner's decision, 2026-10-16)
 		
 		FindReplaceDialog gFindReplace = null;
 		
@@ -611,7 +612,7 @@ namespace UyghurEditPP
 			gTahminYeziliwatidu = false;
 			UyghurSpell imla = gImlab.SpellCheker;
 			Regex finder = gImlab.WordFinder;
-			if(imla == null || finder == null || gEditor.SelectionLength > 0){
+			if(!gTahminOchuq || imla == null || finder == null || gEditor.SelectionLength > 0){
 				TahminTaqa();
 				return;
 			}
@@ -956,6 +957,7 @@ namespace UyghurEditPP
 			else{
 				gYeziqAuto=true;
 			}
+			gTahminOchuq = !(gConfig["TAHMIN"] is bool) || (bool)gConfig["TAHMIN"];
 			
 			
 			if(gConfig.Contains("IMLAYEZIQ")){
@@ -1446,6 +1448,9 @@ namespace UyghurEditPP
 
 			menuImlaAuto.Text = gLang.GetText("Aptomatik Tekshür");
 			menuImlaAuto.ToolTipText = gLang.GetText("Xata-toghra ambirini ishlitip imlasi xata sözlerni aptomatik tüzitidu");
+
+			menuTahmin.Text = gLang.GetText("Word Prediction");
+			menuTahmin.ToolTipText = gLang.GetText("Shows the words that start with what you are typing");
 
 			menuImlaAmbar.Text = gLang.GetText("Ishletküchi Ambirini Körset");
 
@@ -2433,6 +2438,7 @@ namespace UyghurEditPP
 
 		void MenuImlaClick(object sender, EventArgs e){
 			menuYeziqAuto.Checked = gYeziqAuto;
+			menuTahmin.Checked = gTahminOchuq;
 
 			Uyghur.YEZIQ curYeziq = YeziqniBayqa(gEditor);
 			if((menuImlaUEY.Checked && curYeziq == Uyghur.YEZIQ.UEY)||
@@ -2914,10 +2920,18 @@ namespace UyghurEditPP
 			gYeziqAuto = ! gYeziqAuto;
 			menuYeziqAuto.Checked = gYeziqAuto;
 			gConfig["YEZIQAUTO"] = gYeziqAuto;
-			
+
 			if(gYeziqAuto){
 				TabControl1SelectedIndexChanged(null,null);
 			}
+		}
+
+		void MenuTahminClick(object sender, EventArgs e)
+		{
+			gTahminOchuq = !gTahminOchuq;
+			menuTahmin.Checked = gTahminOchuq;
+			gConfig["TAHMIN"] = gTahminOchuq;
+			TahminTaqa();
 		}
 		
 		void MenuHKodDropDownOpened(object sender, EventArgs e)

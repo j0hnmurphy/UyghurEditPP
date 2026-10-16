@@ -613,5 +613,15 @@
     "uly": "Bashqa yéziqlardiki yézilishinimu tap",
     "jpn": "ほかの文字体系の綴りも探す",
     "eng": "Match other Uyghur scripts too"
+  },
+  "Word Prediction": {
+    "uly": "",
+    "jpn": "語の予測",
+    "eng": "Word Prediction"
+  },
+  "Shows the words that start with what you are typing": {
+    "uly": "",
+    "jpn": "打っている語で始まる語の候補を出します",
+    "eng": "Shows the words that start with what you are typing"
   }
 }
