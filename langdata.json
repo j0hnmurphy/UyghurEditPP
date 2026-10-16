@@ -623,5 +623,25 @@
     "uly": "Yéziwatqan sözning namzatlirini körsitidu",
     "jpn": "打っている語で始まる語の候補を出します",
     "eng": "Shows the words that start with what you are typing"
+  },
+  "Forget Learned Words": {
+    "uly": "Tallan’ghan Namzatlarni Öchür",
+    "jpn": "学んだ語を消す",
+    "eng": "Forget Learned Words"
+  },
+  "The words you chose come first in the list; this forgets them": {
+    "uly": "Tallan’ghan namzat sözlerni öchürüwétidu",
+    "jpn": "選んだ語は一覧の先頭に出ます。それを忘れさせます",
+    "eng": "The words you chose come first in the list; this forgets them"
+  },
+  "Forget the words learned from your choices?": {
+    "uly": "Tallan’ghan namzatlarni öchüremsiz?",
+    "jpn": "選んだ語から学んだことを消しますか？",
+    "eng": "Forget the words learned from your choices?"
+  },
+  "The learned words could not be deleted.": {
+    "uly": "Tallan’ghan namzatlarni öchürelmidi.",
+    "jpn": "学んだ語を消せませんでした。",
+    "eng": "The learned words could not be deleted."
   }
 }

@@ -20,6 +20,7 @@ namespace UyghurEditPP
 		public const string ConfigFileName      = "uyghuredit.cfg";
 		public const string IshletkuchiFileName = "imla_ishletkuchi.txt";
 		public const string XataToghraFileName  = "imla_xatatoghra.txt";
+		public const string TahminFileName      = "tahmin_ishletkuchi.txt";  // words chosen from the prediction list
 
 		// Not imla_xatatoghra.txt: the copy in the program folder is the shipped list, and it
 		// is still read from there (with anything older versions appended to it).

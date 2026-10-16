@@ -44,7 +44,7 @@ namespace UyghurEditPP.Tests
 		{
 			SozTahmini t = Create("ab", 90, "abc", 50, "abd", 70, "acc", 99);
 
-			CollectionAssert.AreEqual(new[]{ "abd", "abc" }, TahminQaide.Namzatlar(t, "ab", 5));
+			CollectionAssert.AreEqual(new[]{ "abd", "abc" }, TahminQaide.Namzatlar(t, null, "ab", 5));
 		}
 
 		[TestMethod]
@@ -52,7 +52,7 @@ namespace UyghurEditPP.Tests
 		{
 			SozTahmini t = Create("aba", 1, "abb", 2, "abc", 3, "abd", 4);
 
-			CollectionAssert.AreEqual(new[]{ "abd", "abc" }, TahminQaide.Namzatlar(t, "ab", 2));
+			CollectionAssert.AreEqual(new[]{ "abd", "abc" }, TahminQaide.Namzatlar(t, null, "ab", 2));
 		}
 
 		[TestMethod]
@@ -60,7 +60,7 @@ namespace UyghurEditPP.Tests
 		{
 			SozTahmini t = Create("abc", 5, "abd", 3);
 
-			CollectionAssert.AreEqual(new[]{ "Abc", "Abd" }, TahminQaide.Namzatlar(t, "Ab", 5));
+			CollectionAssert.AreEqual(new[]{ "Abc", "Abd" }, TahminQaide.Namzatlar(t, null, "Ab", 5));
 		}
 
 		static TahminHerket Kunupka(Key key, int tallanghan, out int netije, ModifierKeys mods = ModifierKeys.None)

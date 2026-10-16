@@ -90,6 +90,7 @@ namespace UyghurEditPP
 		int  gTahminBashi, gTahminAyagh;     // the typed part the chosen word replaces
 		bool gTahminYeziliwatidu = false;    // a typed character is going in: its caret move must not close the list
 		bool gTahminReqemYut = false;        // a digit chose a word: its character, if one still comes, is not typed
+		TahminIshletkuchi gTahminOgen;       // the words the user chose, shown first next time
 
         // ① 記号群を定義（共通化してミスを防ぐ）
         const string OPEN = @"‹«\(\[";
@@ -127,6 +128,7 @@ namespace UyghurEditPP
 			mainTab.RemoveTab += DeleteTab;
 			// The list is a window of its own: it would stay where it is when the form moves or another app comes to the front.
 			gTahminPopup.Child = gTahminListe;
+			gTahminOgen = new TahminIshletkuchi(AppPaths.DataFile(AppPaths.TahminFileName));
 			Deactivate += (s, e) => TahminTaqa();
 			Move       += (s, e) => TahminTaqa();
 			Resize     += (s, e) => TahminTaqa();
@@ -628,7 +630,7 @@ namespace UyghurEditPP
 				return;
 			}
 			sozBashi += bashi;
-			List<string> namzatlar = TahminQaide.Namzatlar(imla.Tahmin, doc.GetText(sozBashi, orun - sozBashi), TahminQaide.NamzatSani);
+			List<string> namzatlar = TahminQaide.Namzatlar(imla.Tahmin, gTahminOgen, doc.GetText(sozBashi, orun - sozBashi), TahminQaide.NamzatSani);
 			if(namzatlar.Count == 0){
 				TahminTaqa();
 				return;
@@ -694,6 +696,28 @@ namespace UyghurEditPP
 			gEditor.Document.Replace(gTahminBashi, gTahminAyagh - gTahminBashi, namzat);
 			gEditor.CaretOffset = gTahminBashi + namzat.Length;
 			gEditor.TextArea.Caret.BringCaretToView();
+			try{
+				gTahminOgen.Qosh(namzat);
+			}
+			catch(Exception ee){
+				if(!(ee is IOException || ee is UnauthorizedAccessException)) throw;
+				ErrorLog.Write(ee);  // the word is in the text; only the learning is lost
+			}
+		}
+
+		void MenuTahminOchurClick(object sender, EventArgs e)
+		{
+			if(CenteredMessageBox.Show(this, gLang.GetText("Forget the words learned from your choices?"), "UyghurEdit++ v" + GetVersion(), MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes){
+				return;
+			}
+			try{
+				gTahminOgen.Ochur();
+			}
+			catch(Exception ee){
+				if(!(ee is IOException || ee is UnauthorizedAccessException)) throw;
+				ErrorLog.Write(ee);
+				CenteredMessageBox.Show(this, gLang.GetText("The learned words could not be deleted."), "UyghurEdit++ v" + GetVersion(), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+			}
 		}
 
 		
@@ -1451,6 +1475,8 @@ namespace UyghurEditPP
 
 			menuTahmin.Text = gLang.GetText("Word Prediction");
 			menuTahmin.ToolTipText = gLang.GetText("Shows the words that start with what you are typing");
+			menuTahminOchur.Text = gLang.GetText("Forget Learned Words");
+			menuTahminOchur.ToolTipText = gLang.GetText("The words you chose come first in the list; this forgets them");
 
 			menuImlaAmbar.Text = gLang.GetText("Ishletküchi Ambirini Körset");
 
