@@ -319,6 +319,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Recovery.cs" />
     <Compile Include="SafeFile.cs" />
+    <Compile Include="TahminQaide.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Rendering\BackgroundGeometryBuilder.cs">
       <DependentUpon>IBackgroundRenderer.cs</DependentUpon>
