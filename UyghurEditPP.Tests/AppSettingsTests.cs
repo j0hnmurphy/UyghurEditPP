@@ -56,6 +56,7 @@ namespace UyghurEditPP.Tests
 			h["ACHIQ"] = new[] { @"D:\ئۇيغۇرچە\b.txt", @"C:\Hojjetler\a.txt" };
 			h["ACHIQ_TALLANGHAN"] = @"C:\Hojjetler\a.txt";
 			h["AVTOSAQLASH"] = 5;
+			h["TAHMIN"] = false;   // the default is on, so off is the value worth keeping
 			return h;
 		}
 

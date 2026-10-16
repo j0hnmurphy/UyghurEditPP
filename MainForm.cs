@@ -73,6 +73,7 @@ namespace UyghurEditPP
 		int       gFontStyle  = 0;
 		int       gFontWeight = 0;
 		bool      gYeziqAuto = true;
+		bool      gTahminOchuq = true;   // word prediction; on unless turned off (owner's decision, 2026-10-16)
 		
 		FindReplaceDialog gFindReplace = null;
 		
@@ -81,6 +82,14 @@ namespace UyghurEditPP
 			() => System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("UyghurEditPP.uyghur_imla.txt"),
 			() => new KenjiSpell());
 		string gImlaYeziq = "YOQ";  // the script whose dictionary is wanted (it may still be loading)
+
+		// Word prediction list (rules in TahminQaide.cs). The focus stays in the editor.
+		System.Windows.Controls.Primitives.Popup gTahminPopup = new System.Windows.Controls.Primitives.Popup{
+			StaysOpen = true, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom};
+		System.Windows.Controls.ListBox gTahminListe = new System.Windows.Controls.ListBox{Focusable = false};
+		int  gTahminBashi, gTahminAyagh;     // the typed part the chosen word replaces
+		bool gTahminYeziliwatidu = false;    // a typed character is going in: its caret move must not close the list
+		bool gTahminReqemYut = false;        // a digit chose a word: its character, if one still comes, is not typed
 
         // ① 記号群を定義（共通化してミスを防ぐ）
         const string OPEN = @"‹«\(\[";
@@ -116,6 +125,11 @@ namespace UyghurEditPP
 			
 			gImlab = new ImlaBoya();
 			mainTab.RemoveTab += DeleteTab;
+			// The list is a window of its own: it would stay where it is when the form moves or another app comes to the front.
+			gTahminPopup.Child = gTahminListe;
+			Deactivate += (s, e) => TahminTaqa();
+			Move       += (s, e) => TahminTaqa();
+			Resize     += (s, e) => TahminTaqa();
 			
 			//string fontpath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "UKIJTuz.ttf".ToUpper());
 			//System.Diagnostics.Debug.WriteLine(fontpath);
@@ -173,6 +187,12 @@ namespace UyghurEditPP
 
 		void PreviewKey(object sender, System.Windows.Input.KeyEventArgs e)
 		{
+			gTahminYeziliwatidu = false;
+			gTahminReqemYut = false;
+			// Before the editor's own keys: Tab would indent, Enter break the line, the arrows move the caret.
+			if(gTahminPopup.IsOpen && TahminKunupka(e)){
+				return;
+			}
 			int gModkey =(int)Control.ModifierKeys;
 			gModkey = (gModkey>>16) &0x000f;
 			if(gModkey == 2) //Ctrl Key
@@ -423,6 +443,12 @@ namespace UyghurEditPP
 				//curEdit.PreviewMouseHoverStopped += MouseHoverStop;
 
 				curEdit.TextArea.TextEntering += KeyboardTextInput; //Kunpkidin kirguzush meshghulati qilghanda bu yerge kelidu
+				// Text KeyboardTextInput leaves to the editor (the Windows Uyghur keyboard, left-to-right System) ends here.
+				curEdit.TextArea.TextEntered += (s, e) => {
+					curEdit.TextArea.Caret.BringCaretToView();  // the editor scrolls only after TextEntered; the list goes where the caret will be
+					TahminKorset();
+				};
+				curEdit.TextArea.LostKeyboardFocus += (s, e) => TahminTaqa();
 				
 				curEdit.AllowDrop = true;
 				curEdit.DragEnter += MainFormDragEnter;
@@ -467,6 +493,7 @@ namespace UyghurEditPP
 				//gEditor.TextArea.TextView.InvalidateLayer(UyghurEditPP.Rendering.KnownLayer.Selection);
 			}
 			else{
+				TahminTaqa();   // Tab or Enter must work on the selection (Ctrl+A can leave the caret where it was)
 				gImlab.Selection = gEditor.SelectedText;
 				gImlab.SelectionOffset = gEditor.SelectionStart;
 				gEditor.TextArea.TextView.Redraw();
@@ -518,6 +545,13 @@ namespace UyghurEditPP
 
 		void KeyboardTextInput(object sender,System.Windows.Input.TextCompositionEventArgs e)
 		{
+			if(gTahminReqemYut){
+				// Unverified whether a key handled in PreviewKeyDown still sends its character under ElementHost.
+				gTahminReqemYut = false;
+				e.Handled = true;
+				return;
+			}
+			gTahminYeziliwatidu = true;
 			string newtxt="";
 			if(InputLanguage.CurrentInputLanguage.Culture.ThreeLetterISOLanguageName.Equals("uig")){
 				
@@ -566,8 +600,102 @@ namespace UyghurEditPP
 				}
 				gEditor.TextArea.Caret.BringCaretToView();
 			}
+			if(e.Handled){
+				TahminKorset(); // the editor raises no TextEntered for text put in here
+			}
 		}
-		
+
+		// Shows (or updates) the prediction list for the word that ends at the caret, or closes it.
+		// The script is the spelling script's: no list while its dictionary loads or with spelling off.
+		void TahminKorset()
+		{
+			gTahminYeziliwatidu = false;
+			UyghurSpell imla = gImlab.SpellCheker;
+			Regex finder = gImlab.WordFinder;
+			if(!gTahminOchuq || imla == null || finder == null || gEditor.SelectionLength > 0){
+				TahminTaqa();
+				return;
+			}
+			TextDocument doc = gEditor.Document;
+			int orun = gEditor.CaretOffset;
+			DocumentLine qur = doc.GetLineByOffset(orun);
+			// Dictionary words are at most 30 letters, so 64 on each side are enough (a paragraph can be one long line).
+			int bashi = Math.Max(qur.Offset, orun - 64);
+			int ayagh = Math.Min(qur.EndOffset, orun + 64);
+			int sozBashi = TahminQaide.SozBashi(doc.GetText(bashi, ayagh - bashi), orun - bashi, finder);
+			if(sozBashi < 0 || orun - bashi - sozBashi < TahminQaide.EngQisqa){
+				TahminTaqa();
+				return;
+			}
+			sozBashi += bashi;
+			List<string> namzatlar = TahminQaide.Namzatlar(imla.Tahmin, doc.GetText(sozBashi, orun - sozBashi), TahminQaide.NamzatSani);
+			if(namzatlar.Count == 0){
+				TahminTaqa();
+				return;
+			}
+			gTahminBashi = sozBashi;
+			gTahminAyagh = orun;
+			gTahminListe.Items.Clear();
+			for(int i = 0; i < namzatlar.Count; i++){
+				gTahminListe.Items.Add(new System.Windows.Controls.ListBoxItem{Content = (i + 1) + "  " + namzatlar[i], Tag = namzatlar[i], Focusable = false});
+			}
+			gTahminListe.FlowDirection = gEditor.FlowDirection;
+			gTahminListe.FontFamily = gEditor.FontFamily;
+			gTahminListe.FontSize   = gEditor.FontSize;
+			gTahminListe.Background = gEditor.Background ?? System.Windows.SystemColors.WindowBrush;
+			gTahminListe.Foreground = gEditor.Foreground;
+
+			UyghurEditPP.Rendering.TextView view = gEditor.TextArea.TextView;
+			System.Windows.Rect caret = gEditor.TextArea.Caret.CalculateCaretRectangle();
+			caret.Offset(-view.ScrollOffset.X, -view.ScrollOffset.Y);  // from the top of the document to the view
+			gTahminPopup.PlacementTarget = view;
+			gTahminPopup.PlacementRectangle = caret;   // under the caret; WPF moves it above near the bottom of the screen
+			gTahminPopup.IsOpen = true;
+		}
+
+		void TahminTaqa()
+		{
+			gTahminPopup.IsOpen = false;
+			gTahminPopup.PlacementTarget = null;  // does not keep a closed tab's view
+		}
+
+		// A key while the list is open; true when the list used it.
+		bool TahminKunupka(System.Windows.Input.KeyEventArgs e)
+		{
+			int netije;
+			switch(TahminQaide.Kunupka(e.Key, e.KeyboardDevice.Modifiers, gTahminListe.SelectedIndex, gTahminListe.Items.Count, out netije)){
+				case TahminHerket.Move:
+					gTahminListe.SelectedIndex = netije;
+					if(netije >= 0){
+						gTahminListe.ScrollIntoView(gTahminListe.Items[netije]);
+					}
+					break;
+				case TahminHerket.Choose:
+					gTahminReqemYut = e.Key != System.Windows.Input.Key.Tab && e.Key != System.Windows.Input.Key.Enter;
+					TahminBekit((string)((System.Windows.Controls.ListBoxItem)gTahminListe.Items[netije]).Tag);
+					break;
+				case TahminHerket.Close:
+					TahminTaqa();
+					break;
+				case TahminHerket.CloseAndPass:
+					TahminTaqa();
+					return false;
+				default:
+					return false;
+			}
+			e.Handled = true;
+			return true;
+		}
+
+		// One Replace, so one undo brings back what was typed. No space after it: a suffix often follows.
+		void TahminBekit(string namzat)
+		{
+			TahminTaqa();
+			gEditor.Document.Replace(gTahminBashi, gTahminAyagh - gTahminBashi, namzat);
+			gEditor.CaretOffset = gTahminBashi + namzat.Length;
+			gEditor.TextArea.Caret.BringCaretToView();
+		}
+
 		
 		//Mouse besilghanda, besilgan orundiki sozni elip, uning imlasi toghrimu?
 		//Xata bolsa namzat we bashqa munasiwetlik uchurni korsitidu
@@ -750,6 +878,7 @@ namespace UyghurEditPP
 		//Fontning chongluqini ozgertkili bolidu
 		private void PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
 		{
+			TahminTaqa();  // the list would stay where the caret was
 			bool ctrl = (Control.ModifierKeys == Keys.Control);
 			if (ctrl)
 			{
@@ -828,6 +957,7 @@ namespace UyghurEditPP
 			else{
 				gYeziqAuto=true;
 			}
+			gTahminOchuq = !(gConfig["TAHMIN"] is bool) || (bool)gConfig["TAHMIN"];
 			
 			
 			if(gConfig.Contains("IMLAYEZIQ")){
@@ -1319,6 +1449,9 @@ namespace UyghurEditPP
 			menuImlaAuto.Text = gLang.GetText("Aptomatik Tekshür");
 			menuImlaAuto.ToolTipText = gLang.GetText("Xata-toghra ambirini ishlitip imlasi xata sözlerni aptomatik tüzitidu");
 
+			menuTahmin.Text = gLang.GetText("Word Prediction");
+			menuTahmin.ToolTipText = gLang.GetText("Shows the words that start with what you are typing");
+
 			menuImlaAmbar.Text = gLang.GetText("Ishletküchi Ambirini Körset");
 
 			menuQoral.Text = gLang.GetText("Qorallar");
@@ -1681,6 +1814,9 @@ namespace UyghurEditPP
 		}
 		
 		void CaretChanged(object sender, EventArgs e){
+			if(!gTahminYeziliwatidu && gEditor.CaretOffset != gTahminAyagh){
+				TahminTaqa();   // the caret left the word (a click, the arrows, Backspace)
+			}
 			string herpcode="0000";
 			if (gEditor.CaretOffset<gEditor.Document.TextLength) {
 				UInt32 code = gEditor.TextArea.Document.GetCharAt(gEditor.CaretOffset);
@@ -1692,6 +1828,7 @@ namespace UyghurEditPP
 		
 		void TabControl1SelectedIndexChanged(object sender, EventArgs e)
 		{
+			TahminTaqa();
 			if(mainTab.TabPages.Count>0){
 				if(mainTab.SelectedTab.Tag.ToString().Length ==0){
 					Text = mainTab.SelectedTab.Text + " - UyghurEdit++";
@@ -2301,6 +2438,7 @@ namespace UyghurEditPP
 
 		void MenuImlaClick(object sender, EventArgs e){
 			menuYeziqAuto.Checked = gYeziqAuto;
+			menuTahmin.Checked = gTahminOchuq;
 
 			Uyghur.YEZIQ curYeziq = YeziqniBayqa(gEditor);
 			if((menuImlaUEY.Checked && curYeziq == Uyghur.YEZIQ.UEY)||
@@ -2782,10 +2920,18 @@ namespace UyghurEditPP
 			gYeziqAuto = ! gYeziqAuto;
 			menuYeziqAuto.Checked = gYeziqAuto;
 			gConfig["YEZIQAUTO"] = gYeziqAuto;
-			
+
 			if(gYeziqAuto){
 				TabControl1SelectedIndexChanged(null,null);
 			}
+		}
+
+		void MenuTahminClick(object sender, EventArgs e)
+		{
+			gTahminOchuq = !gTahminOchuq;
+			menuTahmin.Checked = gTahminOchuq;
+			gConfig["TAHMIN"] = gTahminOchuq;
+			TahminTaqa();
 		}
 		
 		void MenuHKodDropDownOpened(object sender, EventArgs e)

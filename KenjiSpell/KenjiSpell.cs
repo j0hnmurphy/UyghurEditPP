@@ -64,7 +64,7 @@ namespace UyghurEditPP
 						if(curNode.mFreq==0){
 							m_SozSani++;
 						}
-						curNode.mFreq = (curNode.mFreq+tekrar)<short.MaxValue?(short)(curNode.mFreq+tekrar):short.MaxValue;
+						curNode.mFreq = (curNode.mFreq+tekrar)<int.MaxValue?(int)(curNode.mFreq+tekrar):int.MaxValue;
 						break;
 					}
 					pos++;
@@ -163,6 +163,7 @@ namespace UyghurEditPP
 				m_RootNode = null;
 			}
 			
+			List<KeyValuePair<string, long>> tahminSozliri = new List<KeyValuePair<string, long>>();
 			using (StreamReader sr = new StreamReader(instr,System.Text.Encoding.UTF8))
 			{
 				String line;
@@ -182,10 +183,12 @@ namespace UyghurEditPP
 						if (Int64.TryParse(lineParts[1], out count))
 						{
 							Add(key, count);
+							tahminSozliri.Add(new KeyValuePair<string, long>(key, count));
 						}
 					}
 				}
 			}
+			Tahmin = new SozTahmini(tahminSozliri);
 			return true;
 		}
 
@@ -515,7 +518,7 @@ namespace UyghurEditPP
 	
 	public class NamzatQelip{
 		public string soz=null;
-		public short  tekrar=-1;
+		public int    tekrar=-1;
 		public short  ariliq=-1;
 		public override string ToString()
 		{

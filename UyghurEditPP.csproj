@@ -295,6 +295,7 @@
     <Compile Include="KenjiSpell\AutoCorrect.cs" />
     <Compile Include="KenjiSpell\ImlaAmbarliri.cs" />
     <Compile Include="KenjiSpell\KenjiSpell.cs" />
+    <Compile Include="KenjiSpell\SozTahmini.cs" />
     <Compile Include="KenjiSpell\UyghurSpell.cs" />
     <Compile Include="KenjiTab.cs">
       <SubType>Component</SubType>
@@ -318,6 +319,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Recovery.cs" />
     <Compile Include="SafeFile.cs" />
+    <Compile Include="TahminQaide.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Rendering\BackgroundGeometryBuilder.cs">
       <DependentUpon>IBackgroundRenderer.cs</DependentUpon>
