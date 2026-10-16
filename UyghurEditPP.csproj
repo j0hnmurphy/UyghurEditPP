@@ -295,6 +295,7 @@
     <Compile Include="KenjiSpell\AutoCorrect.cs" />
     <Compile Include="KenjiSpell\ImlaAmbarliri.cs" />
     <Compile Include="KenjiSpell\KenjiSpell.cs" />
+    <Compile Include="KenjiSpell\SozTahmini.cs" />
     <Compile Include="KenjiSpell\UyghurSpell.cs" />
     <Compile Include="KenjiTab.cs">
       <SubType>Component</SubType>

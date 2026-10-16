@@ -29,6 +29,10 @@ namespace UyghurEditPP
 		
 		protected Uyghur.YEZIQ gYeziq;
 
+		// Word prediction for this dictionary's script, built when the dictionary loads (empty
+		// until then). Words added later (the user's own words) are not in it.
+		public SozTahmini Tahmin { get; protected set; } = new SozTahmini(new KeyValuePair<string, long>[0]);
+
 		string gImlaIshletkuchi = AppPaths.IshletkuchiFileName;
 		string gImlaXataToghra = AppPaths.XataToghraFileName;
 		// The correction list that comes with the program. The user's own corrections
