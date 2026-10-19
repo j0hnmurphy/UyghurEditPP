@@ -49,6 +49,8 @@ namespace UyghurEditPP
 			[DataMember(Name = "activeFile", EmitDefaultValue = false, Order = 14)] public string ActiveFile;
 			// Minutes between the copies of unsaved documents; 0 turns them off. Only set in the file by hand.
 			[DataMember(Name = "autosaveMinutes", EmitDefaultValue = false, Order = 15)] public int? AutosaveMinutes;
+			// Word prediction while typing; none = on.
+			[DataMember(Name = "wordPrediction", EmitDefaultValue = false, Order = 16)] public bool? WordPrediction;
 		}
 
 		[DataContract]
@@ -255,6 +257,7 @@ namespace UyghurEditPP
 			if(d.OpenFiles != null) h["ACHIQ"] = Array.FindAll(d.OpenFiles, f => !string.IsNullOrEmpty(f));
 			if(!string.IsNullOrEmpty(d.ActiveFile)) h["ACHIQ_TALLANGHAN"] = d.ActiveFile;
 			if(d.AutosaveMinutes.HasValue) h["AVTOSAQLASH"] = d.AutosaveMinutes.Value;
+			if(d.WordPrediction.HasValue) h["TAHMIN"] = d.WordPrediction.Value;
 			if(d.CaretOffsets != null){
 				Dictionary<string,int> orunlar = new Dictionary<string, int>();
 				foreach(FileOffset fo in d.CaretOffsets){
@@ -285,6 +288,7 @@ namespace UyghurEditPP
 			d.OpenFiles = h["ACHIQ"] as string[];
 			d.ActiveFile = h["ACHIQ_TALLANGHAN"] as string;
 			if(h["AVTOSAQLASH"] is int) d.AutosaveMinutes = (int)h["AVTOSAQLASH"];
+			if(h["TAHMIN"] is bool) d.WordPrediction = (bool)h["TAHMIN"];
 			Dictionary<string,int> orunlar = h["ORUNLAR"] as Dictionary<string,int>;
 			if(orunlar != null){
 				d.CaretOffsets = new List<FileOffset>();
