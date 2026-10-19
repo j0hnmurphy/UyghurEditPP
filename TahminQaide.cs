@@ -32,17 +32,22 @@ namespace UyghurEditPP
 		}
 
 		/// <summary>
-		/// Up to n dictionary words that start with bash, most frequent first, without bash
-		/// itself; a capital first letter of bash is kept (as the spelling menu does).
+		/// Up to n words that start with bash, without bash itself: the user's learned words
+		/// first (ogen may be null), then the dictionary's, most frequent first. A capital first
+		/// letter of bash is kept (as the spelling menu does).
 		/// </summary>
-		public static List<string> Namzatlar(SozTahmini tahmin, string bash, int n)
+		public static List<string> Namzatlar(SozTahmini tahmin, TahminIshletkuchi ogen, string bash, int n)
 		{
 			string soz = SozTahmini.Normalize(bash);
+			List<string> hemmisi = ogen == null ? new List<string>() : ogen.Find(soz, n + 1);
+			hemmisi.AddRange(tahmin.Find(soz, 2 * n + 2));  // enough left after the learned words and bash are skipped
 			List<string> netije = new List<string>(n);
-			foreach(string namzat in tahmin.Find(soz, n + 1)){
+			foreach(string namzat in hemmisi){
 				if(namzat == soz) continue;
+				string korset = char.IsUpper(bash[0]) ? char.ToUpperInvariant(namzat[0]) + namzat.Substring(1) : namzat;
+				if(netije.Contains(korset)) continue;
 				if(netije.Count == n) break;
-				netije.Add(char.IsUpper(bash[0]) ? char.ToUpperInvariant(namzat[0]) + namzat.Substring(1) : namzat);
+				netije.Add(korset);
 			}
 			return netije;
 		}

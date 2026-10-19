@@ -108,6 +108,7 @@ namespace UyghurEditPP
 		private System.Windows.Forms.ToolStripSeparator toolStripSeparator16;
 		private System.Windows.Forms.ToolStripMenuItem menuImlaAuto;
 		private System.Windows.Forms.ToolStripMenuItem menuTahmin;
+		private System.Windows.Forms.ToolStripMenuItem menuTahminOchur;
 		private System.Windows.Forms.ToolStripMenuItem menuQoral;
 		private System.Windows.Forms.ToolStripMenuItem menuTiz;
 		private System.Windows.Forms.ToolStripSeparator toolStripSeparator12;
@@ -219,6 +220,7 @@ namespace UyghurEditPP
             this.toolStripSeparator12 = new System.Windows.Forms.ToolStripSeparator();
             this.menuImlaAuto = new System.Windows.Forms.ToolStripMenuItem();
             this.menuTahmin = new System.Windows.Forms.ToolStripMenuItem();
+            this.menuTahminOchur = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator16 = new System.Windows.Forms.ToolStripSeparator();
             this.menuBelge = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator20 = new System.Windows.Forms.ToolStripSeparator();
@@ -963,6 +965,7 @@ namespace UyghurEditPP
             this.toolStripSeparator12,
             this.menuImlaAuto,
             this.menuTahmin,
+            this.menuTahminOchur,
             this.toolStripSeparator16,
             this.menuBelge,
             this.toolStripSeparator20,
@@ -1030,6 +1033,14 @@ namespace UyghurEditPP
             this.menuTahmin.Text = "Word Prediction";
             this.menuTahmin.Click += new System.EventHandler(this.MenuTahminClick);
             this.menuTahmin.MouseEnter += new System.EventHandler(this.MenuMouseEntered);
+            //
+            // menuTahminOchur
+            //
+            this.menuTahminOchur.Name = "menuTahminOchur";
+            this.menuTahminOchur.Size = new System.Drawing.Size(348, 22);
+            this.menuTahminOchur.Text = "Forget Learned Words";
+            this.menuTahminOchur.Click += new System.EventHandler(this.MenuTahminOchurClick);
+            this.menuTahminOchur.MouseEnter += new System.EventHandler(this.MenuMouseEntered);
             // 
             // toolStripSeparator16
             // 
