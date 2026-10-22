@@ -10,7 +10,8 @@ namespace UyghurEditPP
 {
 	public class SozTahmini
 	{
-		readonly string[] gSozler;    // ordinal order, so a prefix's words are next to each other
+		readonly string[] gSozler;    // in the ordinal order of their Addiy form, so a prefix's words are next to each other
+		readonly string[] gAddiylar;  // Addiy(gSozler[i])
 		readonly long[] gTekrarlar;
 
 		public SozTahmini(IEnumerable<KeyValuePair<string, long>> sozler)
@@ -25,7 +26,11 @@ namespace UyghurEditPP
 			}
 			gSozler = new string[birleshtur.Count];
 			birleshtur.Keys.CopyTo(gSozler, 0);
-			Array.Sort(gSozler, StringComparer.Ordinal);
+			gAddiylar = new string[gSozler.Length];
+			for(int i = 0; i < gSozler.Length; i++){
+				gAddiylar[i] = Addiy(gSozler[i]);
+			}
+			Array.Sort(gAddiylar, gSozler, StringComparer.Ordinal);
 			gTekrarlar = new long[gSozler.Length];
 			for(int i = 0; i < gSozler.Length; i++){
 				gTekrarlar[i] = birleshtur[gSozler[i]];
@@ -42,6 +47,31 @@ namespace UyghurEditPP
 			return soz.Replace(Uyghur.Sozghuch, "").Trim().ToLowerInvariant();
 		}
 
+		// ULY ö, ü and é take Shift to type, so a typed o, u or e finds them too. The other
+		// scripts have none of these letters, so for them nothing changes.
+		static string Addiy(string soz)
+		{
+			return soz.Replace('ö', 'o').Replace('ü', 'u').Replace('é', 'e');
+		}
+
+		static char Addiy(char herp)
+		{
+			return herp == 'ö' ? 'o' : herp == 'ü' ? 'u' : herp == 'é' ? 'e' : herp;
+		}
+
+		/// <summary>
+		/// Whether the normalized word soz starts with the normalized bash, where a typed o, u
+		/// or e also matches ö, ü or é (a typed ö, ü or é matches only itself).
+		/// </summary>
+		public static bool Bashlinidu(string soz, string bash)
+		{
+			if(soz.Length < bash.Length) return false;
+			for(int i = 0; i < bash.Length; i++){
+				if(soz[i] != bash[i] && Addiy(soz[i]) != bash[i]) return false;
+			}
+			return true;
+		}
+
 		/// <summary>
 		/// Up to n words that start with bash: more frequent first; with the same count the
 		/// shorter word, then ordinal order. The last two rules are not real frequency, only a
@@ -53,11 +83,13 @@ namespace UyghurEditPP
 			if(bash.Length == 0 || n <= 0) return new List<string>();
 			List<int> eng = new List<int>(n + 1);  // indexes of the best words so far, best first
 
-			int bashi = Array.BinarySearch(gSozler, bash, StringComparer.Ordinal);
-			if(bashi < 0) bashi = ~bashi;
-			int ayaghi = Ayaghi(bashi, bash);
+			string addiy = Addiy(bash);
+			int bashi = Bashi(addiy);
+			int ayaghi = Ayaghi(bashi, addiy);
+			bool tallash = addiy != bash;  // only a typed ö, ü or é needs a check: it finds only itself
 
 			for(int i = bashi; i < ayaghi; i++){
+				if(tallash && !Bashlinidu(gSozler[i], bash)) continue;
 				int orun = eng.Count;
 				while(orun > 0 && Aldida(i, eng[orun - 1])) orun--;
 				if(orun < n){
@@ -71,13 +103,26 @@ namespace UyghurEditPP
 			return netije;
 		}
 
-		// The first index at or after bashi whose word does not start with bash.
-		int Ayaghi(int bashi, string bash)
+		// The first index whose Addiy form is not before addiy. Array.BinarySearch would return any of
+		// several equal forms (köz and koz are both koz), so it could skip the first ones.
+		int Bashi(string addiy)
 		{
-			int lo = bashi, hi = gSozler.Length;
+			int lo = 0, hi = gAddiylar.Length;
 			while(lo < hi){
 				int mid = lo + (hi - lo) / 2;
-				if(gSozler[mid].StartsWith(bash, StringComparison.Ordinal)) lo = mid + 1;
+				if(string.CompareOrdinal(gAddiylar[mid], addiy) < 0) lo = mid + 1;
+				else hi = mid;
+			}
+			return lo;
+		}
+
+		// The first index at or after bashi whose Addiy form does not start with addiy.
+		int Ayaghi(int bashi, string addiy)
+		{
+			int lo = bashi, hi = gAddiylar.Length;
+			while(lo < hi){
+				int mid = lo + (hi - lo) / 2;
+				if(gAddiylar[mid].StartsWith(addiy, StringComparison.Ordinal)) lo = mid + 1;
 				else hi = mid;
 			}
 			return lo;

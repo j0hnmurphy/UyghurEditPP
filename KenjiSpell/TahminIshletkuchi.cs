@@ -62,7 +62,7 @@ namespace UyghurEditPP
 			if(bash.Length == 0) return netije;
 			// shortcut: looks at every learned word; fine for the few hundred a person chooses, index them if it grows to many thousands.
 			foreach(string soz in gSozler.Keys){
-				if(soz.StartsWith(bash, StringComparison.Ordinal)) netije.Add(soz);
+				if(SozTahmini.Bashlinidu(soz, bash)) netije.Add(soz);
 			}
 			netije.Sort((a, b) => {
 				int c = gSozler[b].CompareTo(gSozler[a]);

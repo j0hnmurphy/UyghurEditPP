@@ -105,6 +105,67 @@ namespace UyghurEditPP.Tests
 			CollectionAssert.AreEqual(new[]{ "abc" }, t.Find("AB", 5));
 		}
 
+		// ULY: a typed o, u or e also finds ö, ü or é (they take Shift to type); a typed ö, ü or é finds only itself.
+		[TestMethod]
+		public void Find_PlainVowel_AlsoFindsDottedOne()
+		{
+			SozTahmini t = Create("köz", 5, "kor", 3, "küz", 4, "kéz", 2, "kez", 1);
+
+			CollectionAssert.AreEqual(new[]{ "köz", "kor" }, t.Find("ko", 5));
+			CollectionAssert.AreEqual(new[]{ "küz" }, t.Find("ku", 5));
+			CollectionAssert.AreEqual(new[]{ "kéz", "kez" }, t.Find("ke", 5));
+		}
+
+		// Words that differ only in a dot sort side by side; the search must start at the first of them.
+		[TestMethod]
+		public void Find_PlainVowel_FindsEveryWordOfTheSameSpelling()
+		{
+			CollectionAssert.AreEqual(new[]{ "kx", "kö", "ko" }, Create("ko", 1, "kö", 2, "kx", 3).Find("k", 5));
+			CollectionAssert.AreEqual(new[]{ "kö", "ko" }, Create("ko", 1, "kö", 2, "kx", 3).Find("ko", 5));
+			CollectionAssert.AreEqual(new[]{ "koz", "köz", "kozz", "közz" },
+				Create("kaa", 9, "koz", 5, "köz", 4, "kozz", 3, "közz", 2, "kza", 1).Find("ko", 5));
+		}
+
+		// Every word of 1-3 letters from k, o, ö, z (many share a plain spelling), against a plain filter and sort.
+		[TestMethod]
+		public void Find_DottedLetters_AgreesWithFullSort()
+		{
+			string herpler = "koöz";
+			List<string> sozler = new List<string>{ "" };
+			for(int len = 0; len < 3; len++){
+				sozler.AddRange(sozler.Where(s => s.Length == len).SelectMany(s => herpler.Select(h => s + h)).ToList());
+			}
+			sozler.Remove("");
+			List<object> sozTekrar = new List<object>();
+			for(int i = 0; i < sozler.Count; i++){ sozTekrar.Add(sozler[i]); sozTekrar.Add((i * 7) % 5); }
+			SozTahmini t = Create(sozTekrar.ToArray());
+
+			foreach(string bash in sozler.Where(s => s.Length <= 2)){
+				string[] expected = sozler.Select((s, i) => new { s, c = (i * 7) % 5 }).Where(x => SozTahmini.Bashlinidu(x.s, bash))
+					.OrderByDescending(x => x.c).ThenBy(x => x.s.Length).ThenBy(x => x.s, StringComparer.Ordinal)
+					.Take(5).Select(x => x.s).ToArray();
+				CollectionAssert.AreEqual(expected, t.Find(bash, 5), bash);
+			}
+		}
+
+		[TestMethod]
+		public void Find_DottedVowel_FindsOnlyItself()
+		{
+			SozTahmini t = Create("köz", 5, "kor", 3, "kéz", 2, "kez", 1);
+
+			CollectionAssert.AreEqual(new[]{ "köz" }, t.Find("kö", 5));
+			CollectionAssert.AreEqual(new[]{ "kéz" }, t.Find("ké", 5));
+		}
+
+		[TestMethod]
+		public void Find_PlainVowel_KeepsTheCountOrderAcrossBothSpellings()
+		{
+			SozTahmini t = Create("ola", 2, "öla", 9, "olb", 5, "ölb", 1);
+
+			CollectionAssert.AreEqual(new[]{ "öla", "olb", "ola", "ölb" }, t.Find("ol", 5));
+			CollectionAssert.AreEqual(new[]{ "öla", "olb" }, t.Find("OL", 2));
+		}
+
 		// A KenjiSpell dictionary also builds the prediction table, in the dictionary's script.
 		[TestMethod]
 		public void KenjiSpell_Load_BuildsPredictionInEachScript()
