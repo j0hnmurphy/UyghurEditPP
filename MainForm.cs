@@ -2620,6 +2620,15 @@ namespace UyghurEditPP
 				kun = KUNUPKA.System;
 			}
 			SetKunupka(kun);
+			// A new document starts with Arabic-script spelling, and the word prediction follows the spelling script.
+			if(gYeziqAuto){
+				if(kun == KUNUPKA.Uyghur){
+					ImlaniAktipla("UEY");
+				}
+				else if(kun == KUNUPKA.UyghurLY){
+					ImlaniAktipla("ULY");
+				}
+			}
 		}
 		
 		void SetKunupka(KUNUPKA kun){

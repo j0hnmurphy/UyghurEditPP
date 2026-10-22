@@ -107,6 +107,26 @@ namespace UyghurEditPP.Tests
 		}
 
 		[TestMethod]
+		public void Find_PlainVowel_AlsoFindsDottedOne()
+		{
+			TahminIshletkuchi t = new TahminIshletkuchi(gFile);
+			t.Qosh("köz");
+			t.Qosh("kor");
+
+			CollectionAssert.AreEqual(new[]{ "kor", "köz" }, t.Find("ko", 5));
+			CollectionAssert.AreEqual(new[]{ "köz" }, t.Find("kö", 5));
+		}
+
+		[TestMethod]
+		public void Namzatlar_PlainVowel_DottedWordKeepsCapital()
+		{
+			SozTahmini lughet = Dictionary("köz", 90, "kor", 70);
+			TahminIshletkuchi t = new TahminIshletkuchi(gFile);
+
+			CollectionAssert.AreEqual(new[]{ "Köz", "Kor" }, TahminQaide.Namzatlar(lughet, t, "Ko", 5));
+		}
+
+		[TestMethod]
 		public void Namzatlar_NotTheTypedWord()
 		{
 			SozTahmini lughet = Dictionary("ab", 90, "abc", 70);
