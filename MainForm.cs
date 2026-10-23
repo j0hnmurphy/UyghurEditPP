@@ -2632,6 +2632,10 @@ namespace UyghurEditPP
 				else if(kun == KUNUPKA.UyghurLY){
 					ImlaniAktipla("ULY");
 				}
+				// An empty document also takes the keyboard's direction; one with text keeps its own.
+				if(kun != KUNUPKA.System && gEditor != null && gEditor.Document.TextLength == 0){
+					gEditor.RightToLeft = kun == KUNUPKA.Uyghur;
+				}
 			}
 		}
 		
