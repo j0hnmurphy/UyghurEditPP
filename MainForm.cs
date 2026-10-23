@@ -89,7 +89,7 @@ namespace UyghurEditPP
 		System.Windows.Controls.ListBox gTahminListe = new System.Windows.Controls.ListBox{Focusable = false};
 		int  gTahminBashi, gTahminAyagh;     // the typed part the chosen word replaces
 		bool gTahminYeziliwatidu = false;    // a typed character is going in: its caret move must not close the list
-		bool gTahminReqemYut = false;        // a digit chose a word: its character, if one still comes, is not typed
+		string gTahminReqemYut = null;       // a digit chose a word: that digit's character, if it still comes next, is not typed
 		TahminIshletkuchi gTahminOgen;       // the words the user chose, shown first next time
 
         // ① 記号群を定義（共通化してミスを防ぐ）
@@ -190,7 +190,7 @@ namespace UyghurEditPP
 		void PreviewKey(object sender, System.Windows.Input.KeyEventArgs e)
 		{
 			gTahminYeziliwatidu = false;
-			gTahminReqemYut = false;
+			gTahminReqemYut = null;
 			// Before the editor's own keys: Tab would indent, Enter break the line, the arrows move the caret.
 			if(gTahminPopup.IsOpen && TahminKunupka(e)){
 				return;
@@ -547,11 +547,15 @@ namespace UyghurEditPP
 
 		void KeyboardTextInput(object sender,System.Windows.Input.TextCompositionEventArgs e)
 		{
-			if(gTahminReqemYut){
+			if(gTahminReqemYut != null){
 				// Unverified whether a key handled in PreviewKeyDown still sends its character under ElementHost.
-				gTahminReqemYut = false;
-				e.Handled = true;
-				return;
+				// Text put in without a key press (no PreviewKey to clear the flag) must not lose its first character.
+				bool yut = e.Text == gTahminReqemYut;
+				gTahminReqemYut = null;
+				if(yut){
+					e.Handled = true;
+					return;
+				}
 			}
 			gTahminYeziliwatidu = true;
 			string newtxt="";
@@ -673,7 +677,7 @@ namespace UyghurEditPP
 					}
 					break;
 				case TahminHerket.Choose:
-					gTahminReqemYut = e.Key != System.Windows.Input.Key.Tab && e.Key != System.Windows.Input.Key.Enter;
+					gTahminReqemYut = e.Key != System.Windows.Input.Key.Tab && e.Key != System.Windows.Input.Key.Enter ? (netije + 1).ToString() : null;
 					TahminBekit((string)((System.Windows.Controls.ListBoxItem)gTahminListe.Items[netije]).Tag);
 					break;
 				case TahminHerket.Close:
